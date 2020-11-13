@@ -6,6 +6,7 @@ use std::io::prelude::*;
 
 mod cpu;
 mod register;
+mod opcode;
 
 use cpu::Cpu;
 
@@ -22,9 +23,13 @@ fn main() -> io::Result<()> {
     file.read_to_end(&mut binary)?;
     let mut cpu = Cpu::new(binary);
 
-    while cpu.pc < 0x0160 {
+    loop {
         let inst = cpu.fetch();
-        cpu.execute(inst);
+
+        match cpu.execute(inst) {
+            Ok(offset) => cpu.pc += offset,
+            Err(()) => break,
+        }
     }
 
     println!("{}", cpu.dump());
