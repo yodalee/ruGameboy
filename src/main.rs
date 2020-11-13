@@ -6,9 +6,10 @@ use std::io::prelude::*;
 
 mod cpu;
 mod register;
-mod opcode;
+mod instruction;
 
 use cpu::Cpu;
+use instruction::Instruction;
 
 fn main() -> io::Result<()> {
 
@@ -24,11 +25,15 @@ fn main() -> io::Result<()> {
     let mut cpu = Cpu::new(binary);
 
     loop {
-        let inst = cpu.fetch();
-
-        match cpu.execute(inst) {
-            Ok(offset) => cpu.pc += offset,
-            Err(()) => break,
+        let byte = cpu.load8();
+        if let Some(inst) = Instruction::from_byte(byte) {
+            match cpu.execute(inst) {
+                Ok(offset) => cpu.pc += offset,
+                Err(()) => break,
+            }
+        } else {
+            dbg!(&format!("Unsupport instruction {:#x}", byte));
+            break;
         }
     }
 
