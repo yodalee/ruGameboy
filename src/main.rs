@@ -5,6 +5,7 @@ use std::io;
 use std::io::prelude::*;
 
 mod cpu;
+mod register;
 
 use cpu::Cpu;
 
