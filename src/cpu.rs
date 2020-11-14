@@ -1,11 +1,12 @@
 use crate::register::Register;
 use crate::instruction::{Instruction, Target, Condition};
+use crate::bus::Bus;
 
 pub struct Cpu {
     regs: Register,
     sp: u16,
     pub pc: u16,
-    memory: Vec<u8>,
+    bus: Bus,
 }
 
 impl Cpu {
@@ -14,27 +15,20 @@ impl Cpu {
             regs: Register::default(),
             sp: 0,
             pc: 0x0100, // Starting point of execution
-            memory: binary,
+            bus: Bus::new(binary),
         }
     }
 
-    pub fn load8(&self) -> u8 {
-        let index = self.pc as usize;
-        let value = self.memory[index];
-        value
+    pub fn fetch(&self) -> Result<u16, ()> {
+        self.bus.load(self.pc, 8)
     }
 
-    pub fn loadimm8(&self, addr: u16) -> u8 {
-        self.memory[addr as usize]
+    pub fn load(&self, addr: u16, size: u16) -> Result<u16, ()> {
+        self.bus.load(addr, size)
     }
 
-    pub fn loadimm16(&self, addr: u16) -> u16 {
-        ((self.memory[(addr+1) as usize] as u16) << 8)
-            | self.memory[addr as usize] as u16
-    }
-
-    pub fn store(&mut self, addr: u16, value: u8) {
-        self.memory[addr as usize] = value
+    pub fn store(&mut self, addr: u16, size: u16, value: u16) -> Result<(), ()> {
+        self.bus.store(addr, size, value)
     }
 
     pub fn execute(&mut self, inst: Instruction) -> Result<u16, ()> {
@@ -43,14 +37,14 @@ impl Cpu {
         match inst {
             Instruction::NOP => {},
             Instruction::JP => {
-                let addr = self.loadimm16(self.pc + 1);
+                let addr = self.load(self.pc + 1, 16)?;
                 self.pc = addr;
             },
             Instruction::DI => {
                 // disable interrupt, since we have no interrupt yet
             }
             Instruction::LDIMM16(target) => {
-                let imm = self.loadimm16(self.pc + 1);
+                let imm = self.load(self.pc + 1, 16)?;
                 match target {
                     Target::BC => self.regs.set_bc(imm),
                     Target::DE => self.regs.set_de(imm),
@@ -63,15 +57,15 @@ impl Cpu {
                 }
             }
             Instruction::LD16A => {
-                let addr = self.loadimm16(self.pc + 1);
-                self.store(addr, self.regs.a);
+                let addr = self.load(self.pc + 1, 16)?;
+                self.store(addr, 8, self.regs.a as u16);
             }
             Instruction::LDA16 => {
-                let addr = self.loadimm16(self.pc + 1);
-                self.regs.a = self.loadimm8(addr);
+                let addr = self.load(self.pc + 1, 16)?;
+                self.regs.a = self.load(addr, 8)? as u8;
             }
             Instruction::LDIMM8(target) => {
-                let imm = self.loadimm8(self.pc + 1);
+                let imm = self.load(self.pc + 1, 8)? as u8;
                 match target {
                     Target::A => self.regs.a = imm,
                     Target::B => self.regs.b = imm,
@@ -80,7 +74,7 @@ impl Cpu {
                     Target::E => self.regs.e = imm,
                     Target::H => self.regs.h = imm,
                     Target::L => self.regs.l = imm,
-                    Target::HL => self.store(self.regs.get_hl(), imm),
+                    Target::HL => self.store(self.regs.get_hl(), 8, imm as u16)?,
                     _ => {
                         dbg!("Invalid target for instruction {:?}, target");
                         return Err(());
@@ -88,23 +82,23 @@ impl Cpu {
                 }
             }
             Instruction::LD8A => {
-                let addr = 0xff00 + (self.loadimm8(self.pc + 1) as u16);
-                self.store(addr, self.regs.a);
+                let addr = 0xff00 + (self.load(self.pc + 1, 8)?);
+                self.store(addr, 8, self.regs.a as u16);
             }
             Instruction::LDA8 => {
-                let addr = 0xff00 + (self.loadimm8(self.pc + 1) as u16);
-                self.regs.a = self.loadimm8(addr);
+                let addr = 0xff00 + (self.load(self.pc + 1, 8)?);
+                self.regs.a = self.load(addr, 8)? as u8;
             }
             Instruction::LDRR(source, target) => {
                 match (source, target) {
                     (Target::L, Target::A) => self.regs.a = self.regs.l,
                     (Target::H, Target::A) => self.regs.a = self.regs.h,
                     (Target::HLINC, Target::A) => {
-                        self.store(self.regs.get_hl(), self.regs.a);
+                        self.store(self.regs.get_hl(), 8, self.regs.a as u16);
                         self.regs.set_hl(self.regs.get_hl() + 1);
                     },
                     (Target::HLDEC, Target::A) => {
-                        self.store(self.regs.get_hl(), self.regs.a);
+                        self.store(self.regs.get_hl(), 8, self.regs.a as u16);
                         self.regs.set_hl(self.regs.get_hl() + 1);
                     },
                     (_, _) => {
@@ -114,9 +108,8 @@ impl Cpu {
                 }
             }
             Instruction::CALL => {
-                let addr = self.loadimm16(self.pc + 1);
-                self.store(self.sp, (((self.pc + 2) >> 8) & 0xff) as u8);
-                self.store(self.sp-1, ((self.pc + 2) & 0xff) as u8);
+                let addr = self.load(self.pc + 1, 16)?;
+                self.store(self.sp-1, 16, self.pc + 2);
                 self.sp -= 2;
                 self.pc = addr;
             }
@@ -129,7 +122,7 @@ impl Cpu {
                     Condition::Always => true,
                 };
                 if should_ret {
-                    self.pc = self.loadimm16(self.sp + 1);
+                    self.pc = self.load(self.sp + 1, 16)?;
                     self.sp += 2;
                 }
             }
@@ -144,12 +137,11 @@ impl Cpu {
                         return Err(());
                     }
                 };
-                self.store(self.sp, ((value >> 8) & 0xff) as u8);
-                self.store(self.sp-1, (value & 0xff) as u8);
+                self.store(self.sp-1, 16, value);
                 self.sp -= 2;
             }
             Instruction::POP(target) => {
-                let value = self.loadimm16(self.sp+2);
+                let value = self.load(self.sp+1, 16)?;
                 match target {
                     Target::BC => self.regs.set_bc(value),
                     Target::DE => self.regs.set_de(value),
@@ -171,9 +163,8 @@ impl Cpu {
                     Condition::Always => true,
                 };
                 if should_jump {
-                    let offset = self.loadimm8(self.pc + 1) as i8;
+                    let offset = self.load(self.pc + 1, 8)? as i8;
                     self.pc = self.pc.wrapping_add(offset as u16);
-                    return Ok(0);
                 }
             }
             Instruction::INC(target) => {
