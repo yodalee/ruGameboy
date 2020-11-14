@@ -32,7 +32,9 @@ impl Cpu {
     }
 
     pub fn execute(&mut self, inst: Instruction) -> Result<u16, ()> {
+        /* debug
         println!("{}", self.dump());
+        */
         let len = inst.len();
         match inst {
             Instruction::NOP => {},
@@ -173,11 +175,21 @@ impl Cpu {
                     }
                 }
             }
-            Instruction::CALL => {
-                let addr = self.load(self.pc + 1, 16)?;
-                self.store(self.sp-1, 16, self.pc + 2);
-                self.sp -= 2;
-                self.pc = addr;
+            Instruction::CALL(condition) => {
+                let should_call = match condition {
+                    Condition::NotZero => !self.regs.f.zero,
+                    Condition::Zero => self.regs.f.zero,
+                    Condition::NotCarry => !self.regs.f.carry,
+                    Condition::Carry => self.regs.f.carry,
+                    Condition::Always => true,
+                };
+                if should_call {
+                    let addr = self.load(self.pc + 1, 16)?;
+                    self.store(self.sp-1, 16, self.pc + 2);
+                    self.sp -= 2;
+                    self.pc = addr;
+                    return Ok(0);
+                }
             }
             Instruction::RET(condition) => {
                 let should_ret = match condition {
@@ -341,6 +353,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
                     Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
                     Target::A  => self.regs.a,
+                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());
@@ -363,6 +376,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
                     Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
                     Target::A  => self.regs.a,
+                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());
@@ -386,6 +400,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
                     Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
                     Target::A  => self.regs.a,
+                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());
@@ -409,6 +424,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
                     Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
                     Target::A  => self.regs.a,
+                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());
@@ -433,6 +449,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
                     Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
                     Target::A  => self.regs.a,
+                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());
@@ -454,6 +471,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
                     Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
                     Target::A  => self.regs.a,
+                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());
@@ -475,6 +493,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
                     Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
                     Target::A  => self.regs.a,
+                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());
@@ -496,6 +515,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
                     Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
                     Target::A  => self.regs.a,
+                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());

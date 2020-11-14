@@ -10,7 +10,7 @@ pub enum Instruction {
     LD8A,
     LDA8,
     LDRR(Source, Target),
-    CALL,
+    CALL(Condition),
     RET(Condition),
     PUSH(Target),
     POP(Target),
@@ -30,7 +30,7 @@ pub enum Instruction {
 }
 
 type Source = Target;
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum Target {
     A,
     B,
@@ -46,6 +46,7 @@ pub enum Target {
     HLINC,
     HLDEC,
     SP,
+    D8
 }
 
 #[derive(Debug)]
@@ -79,7 +80,11 @@ impl Instruction {
             0x3e => Some(Instruction::LDIMM8(Target::A)),
             0xe0 => Some(Instruction::LD8A),
             0xf0 => Some(Instruction::LDA8),
-            0xcd => Some(Instruction::CALL),
+            0xc4 => Some(Instruction::CALL(Condition::NotZero)),
+            0xcc => Some(Instruction::CALL(Condition::Zero)),
+            0xcd => Some(Instruction::CALL(Condition::Always)),
+            0xd4 => Some(Instruction::CALL(Condition::NotCarry)),
+            0xdc => Some(Instruction::CALL(Condition::Carry)),
             0xc0 => Some(Instruction::RET(Condition::NotZero)),
             0xc8 => Some(Instruction::RET(Condition::Zero)),
             0xc9 => Some(Instruction::RET(Condition::Always)),
@@ -189,6 +194,7 @@ impl Instruction {
             0x85 => Some(Instruction::ADD(Target::L)),
             0x86 => Some(Instruction::ADD(Target::HL)),
             0x87 => Some(Instruction::ADD(Target::A)),
+            0xc6 => Some(Instruction::ADD(Target::D8)),
             0x88 => Some(Instruction::ADC(Target::B)),
             0x89 => Some(Instruction::ADC(Target::C)),
             0x8a => Some(Instruction::ADC(Target::D)),
@@ -197,6 +203,7 @@ impl Instruction {
             0x8d => Some(Instruction::ADC(Target::L)),
             0x8e => Some(Instruction::ADC(Target::HL)),
             0x8f => Some(Instruction::ADC(Target::A)),
+            0xce => Some(Instruction::ADC(Target::D8)),
             0x90 => Some(Instruction::SUB(Target::B)),
             0x91 => Some(Instruction::SUB(Target::C)),
             0x92 => Some(Instruction::SUB(Target::D)),
@@ -205,6 +212,7 @@ impl Instruction {
             0x95 => Some(Instruction::SUB(Target::L)),
             0x96 => Some(Instruction::SUB(Target::HL)),
             0x97 => Some(Instruction::SUB(Target::A)),
+            0xd6 => Some(Instruction::SUB(Target::D8)),
             0x98 => Some(Instruction::SBC(Target::B)),
             0x99 => Some(Instruction::SBC(Target::C)),
             0x9a => Some(Instruction::SBC(Target::D)),
@@ -213,6 +221,7 @@ impl Instruction {
             0x9d => Some(Instruction::SBC(Target::L)),
             0x9e => Some(Instruction::SBC(Target::HL)),
             0x9f => Some(Instruction::SBC(Target::A)),
+            0xde => Some(Instruction::SBC(Target::D8)),
             0xa0 => Some(Instruction::AND(Target::B)),
             0xa1 => Some(Instruction::AND(Target::C)),
             0xa2 => Some(Instruction::AND(Target::D)),
@@ -221,6 +230,7 @@ impl Instruction {
             0xa5 => Some(Instruction::AND(Target::L)),
             0xa6 => Some(Instruction::AND(Target::HL)),
             0xa7 => Some(Instruction::AND(Target::A)),
+            0xe6 => Some(Instruction::AND(Target::D8)),
             0xa8 => Some(Instruction::XOR(Target::B)),
             0xa9 => Some(Instruction::XOR(Target::C)),
             0xaa => Some(Instruction::XOR(Target::D)),
@@ -229,6 +239,7 @@ impl Instruction {
             0xad => Some(Instruction::XOR(Target::L)),
             0xae => Some(Instruction::XOR(Target::HL)),
             0xaf => Some(Instruction::XOR(Target::A)),
+            0xee => Some(Instruction::XOR(Target::D8)),
             0xb0 => Some(Instruction::OR(Target::B)),
             0xb1 => Some(Instruction::OR(Target::C)),
             0xb2 => Some(Instruction::OR(Target::D)),
@@ -237,6 +248,7 @@ impl Instruction {
             0xb5 => Some(Instruction::OR(Target::L)),
             0xb6 => Some(Instruction::OR(Target::HL)),
             0xb7 => Some(Instruction::OR(Target::A)),
+            0xf6 => Some(Instruction::OR(Target::D8)),
             0xb8 => Some(Instruction::CMP(Target::B)),
             0xb9 => Some(Instruction::CMP(Target::C)),
             0xba => Some(Instruction::CMP(Target::D)),
@@ -245,6 +257,7 @@ impl Instruction {
             0xbd => Some(Instruction::CMP(Target::L)),
             0xbe => Some(Instruction::CMP(Target::HL)),
             0xbf => Some(Instruction::CMP(Target::A)),
+            0xfe => Some(Instruction::CMP(Target::D8)),
             _ => None
         }
     }
@@ -261,7 +274,7 @@ impl Instruction {
             Instruction::LD8A => 2,
             Instruction::LDA8 => 2,
             Instruction::LDRR(_, _) => 1,
-            Instruction::CALL => 0,
+            Instruction::CALL(_) => 3,
             Instruction::RET(_) => 1,
             Instruction::PUSH(_) => 1,
             Instruction::POP(_)  => 1,
@@ -270,14 +283,14 @@ impl Instruction {
             Instruction::DEC16(_) => 1,
             Instruction::INC8(_) => 1,
             Instruction::DEC8(_) => 1,
-            Instruction::ADD(_) => 1,
-            Instruction::ADC(_) => 1,
-            Instruction::SUB(_) => 1,
-            Instruction::SBC(_) => 1,
-            Instruction::AND(_) => 1,
-            Instruction::XOR(_) => 1,
-            Instruction::OR(_) => 1,
-            Instruction::CMP(_) => 1,
+            Instruction::ADD(t) => if t == &Target::D8 { 2 } else { 1 },
+            Instruction::ADC(t) => if t == &Target::D8 { 2 } else { 1 },
+            Instruction::SUB(t) => if t == &Target::D8 { 2 } else { 1 },
+            Instruction::SBC(t) => if t == &Target::D8 { 2 } else { 1 },
+            Instruction::AND(t) => if t == &Target::D8 { 2 } else { 1 },
+            Instruction::XOR(t) => if t == &Target::D8 { 2 } else { 1 },
+            Instruction::OR(t) =>  if t == &Target::D8 { 2 } else { 1 },
+            Instruction::CMP(t) => if t == &Target::D8 { 2 } else { 1 },
         }
     }
 }
