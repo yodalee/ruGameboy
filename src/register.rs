@@ -81,6 +81,15 @@ impl Register {
         self.h = ((value >> 8) & 0xff) as u8;
         self.l = (value & 0xff) as u8;
     }
+
+    //TODO, optimize this
+    pub fn inc_hl(&mut self) {
+        self.set_hl(self.get_hl().wrapping_add(1));
+    }
+
+    pub fn dec_hl(&mut self) {
+        self.set_hl(self.get_hl().wrapping_sub(1));
+    }
 }
 
 impl fmt::Display for Register {

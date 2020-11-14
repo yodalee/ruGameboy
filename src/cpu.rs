@@ -142,13 +142,30 @@ impl Cpu {
                     (&Target::L,  &Target::L) => self.regs.l = self.regs.l,
                     (&Target::HL, &Target::L) => self.regs.l = self.load(self.regs.get_hl(), 8)? as u8,
                     (&Target::A,  &Target::L) => self.regs.l = self.regs.a,
+
+                    (&Target::A, &Target::BC) => self.store(self.regs.get_bc(), 8, self.regs.a as u16)?,
+                    (&Target::A, &Target::DE) => self.store(self.regs.get_de(), 8, self.regs.a as u16)?,
+                    (&Target::A, &Target::HLINC) => {
+                        self.store(self.regs.get_hl(), 8, self.regs.a as u16)?;
+                        self.regs.inc_hl();
+                    },
+                    (&Target::A, &Target::HLDEC) => {
+                        self.store(self.regs.get_hl(), 8, self.regs.a as u16)?;
+                        self.regs.dec_hl();
+                    },
+                    (&Target::BC, &Target::A) => {
+                        self.regs.a = self.load(self.regs.get_bc(), 8)? as u8;
+                    },
+                    (&Target::DE, &Target::A) => {
+                        self.regs.a = self.load(self.regs.get_de(), 8)? as u8;
+                    },
                     (&Target::HLINC, &Target::A) => {
-                        self.store(self.regs.get_hl(), 8, self.regs.a as u16);
-                        self.regs.set_hl(self.regs.get_hl() + 1);
+                        self.regs.a = self.load(self.regs.get_hl(), 8)? as u8;
+                        self.regs.inc_hl();
                     },
                     (&Target::HLDEC, &Target::A) => {
-                        self.store(self.regs.get_hl(), 8, self.regs.a as u16);
-                        self.regs.set_hl(self.regs.get_hl() + 1);
+                        self.regs.a = self.load(self.regs.get_hl(), 8)? as u8;
+                        self.regs.dec_hl();
                     },
                     (_, _) => {
                         dbg!(format!("Invalid target for instruction {:?} {:?}", source, target));
@@ -216,12 +233,98 @@ impl Cpu {
                     self.pc = self.pc.wrapping_add(offset as u16);
                 }
             }
-            Instruction::INC(target) => {
+            Instruction::INC16(target) => {
                 match target {
-                    Target::BC => self.regs.set_bc(self.regs.get_bc() + 1),
-                    Target::DE => self.regs.set_de(self.regs.get_de() + 1),
-                    Target::HL => self.regs.set_hl(self.regs.get_hl() + 1),
+                    Target::BC => self.regs.set_bc(self.regs.get_bc().wrapping_add(1)),
+                    Target::DE => self.regs.set_de(self.regs.get_de().wrapping_add(1)),
+                    Target::HL => self.regs.set_hl(self.regs.get_hl().wrapping_add(1)),
                     Target::SP => self.sp += 1,
+                    _ => {
+                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        return Err(());
+                    }
+                }
+            }
+            Instruction::DEC16(target) => {
+                match target {
+                    Target::BC => self.regs.set_bc(self.regs.get_bc().wrapping_sub(1)),
+                    Target::DE => self.regs.set_de(self.regs.get_de().wrapping_sub(1)),
+                    Target::HL => self.regs.set_hl(self.regs.get_hl().wrapping_sub(1)),
+                    Target::SP => self.sp -= 1,
+                    _ => {
+                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        return Err(());
+                    }
+                }
+            }
+            Instruction::INC8(target) => {
+                let mut value = match target {
+                    Target::A  => self.regs.a,
+                    Target::B  => self.regs.b,
+                    Target::C  => self.regs.c,
+                    Target::D  => self.regs.d,
+                    Target::E  => self.regs.e,
+                    Target::H  => self.regs.h,
+                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::L  => self.regs.l,
+
+                    _ => {
+                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        return Err(());
+                    }
+                };
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = ((value & 0x0f) == 0x0f);
+                value = value.wrapping_add(1);
+                self.regs.f.zero = value == 0;
+                // note that we have to update regs.a and sum after check other flag
+                match target {
+                    Target::A  => self.regs.a = value,
+                    Target::B  => self.regs.b = value,
+                    Target::C  => self.regs.c = value,
+                    Target::D  => self.regs.d = value,
+                    Target::E  => self.regs.e = value,
+                    Target::H  => self.regs.h = value,
+                    Target::HL => self.store(self.regs.get_hl(), 8, value as u16)?,
+                    Target::L  => self.regs.l = value,
+
+                    _ => {
+                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        return Err(());
+                    }
+                }
+            }
+            Instruction::DEC8(target) => {
+                let mut value = match target {
+                    Target::A  => self.regs.a,
+                    Target::B  => self.regs.b,
+                    Target::C  => self.regs.c,
+                    Target::D  => self.regs.d,
+                    Target::E  => self.regs.e,
+                    Target::H  => self.regs.h,
+                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::L  => self.regs.l,
+
+                    _ => {
+                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        return Err(());
+                    }
+                };
+                self.regs.f.subtract = true;
+                self.regs.f.half_carry = ((value & 0x0f) == 0x00);
+                value = value.wrapping_sub(1);
+                self.regs.f.zero = value == 0;
+                // note that we have to update regs.a and sum after check other flag
+                match target {
+                    Target::A  => self.regs.a = value,
+                    Target::B  => self.regs.b = value,
+                    Target::C  => self.regs.c = value,
+                    Target::D  => self.regs.d = value,
+                    Target::E  => self.regs.e = value,
+                    Target::H  => self.regs.h = value,
+                    Target::HL => self.store(self.regs.get_hl(), 8, value as u16)?,
+                    Target::L  => self.regs.l = value,
+
                     _ => {
                         dbg!(format!("Invalid target for instruction {:?}", target));
                         return Err(());
