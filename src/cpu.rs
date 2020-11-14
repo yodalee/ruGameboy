@@ -409,9 +409,12 @@ impl Cpu {
 
     pub fn dump(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!("register {:?}\n", self.regs));
-        output.push_str(&format!("SP = {:#x}\n", self.sp));
-        output.push_str(&format!("pc = {:#x}\n", self.pc));
+        output.push_str(&format!("Register {{ {} }}\n", self.regs));
+        output.push_str(&format!("SP = {:#x}\t", self.sp));
+        output.push_str(&format!("pc = {:#x}\t", self.pc));
+        let byte = self.load(self.pc, 8).unwrap() as u8;
+        output.push_str(&format!("byte = {:#x}\t", byte));
+        output.push_str(&format!("inst = {:?}", Instruction::from_byte(byte)));
         output
     }
 }

@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug,Default)]
 pub struct FlagRegister {
     pub zero: bool,
@@ -78,5 +80,27 @@ impl Register {
     pub fn set_hl(&mut self, value: u16) {
         self.h = ((value >> 8) & 0xff) as u8;
         self.l = (value & 0xff) as u8;
+    }
+}
+
+impl fmt::Display for Register {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut output = String::new();
+        output = format!("{} af:{:02X}{:02X}", output, self.a, u8::from(&self.f));
+        output = format!("{} bc:{:02X}{:02X}", output, self.b, self.c);
+        output = format!("{} de:{:02X}{:02X}", output, self.d, self.e);
+        output = format!("{} hl:{:02x}{:02X}", output, self.h, self.l);
+        write!(f, "Register {{ {} }}", output)
+    }
+}
+
+impl fmt::Display for FlagRegister {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let output = String::new();
+        write!(f, "Z {} SUB {} HC {} C {}",
+                    if self.zero { 1 } else { 0 },
+                    if self.subtract { 1 } else { 0 },
+                    if self.half_carry { 1 } else { 0 },
+                    if self.carry { 1 } else { 0 })
     }
 }
