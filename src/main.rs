@@ -4,6 +4,8 @@ use std::io;
 use std::io::prelude::*;
 use log::{error, debug};
 
+use minifb::{Key, Window, WindowOptions};
+
 mod cpu;
 mod register;
 mod instruction;
@@ -12,6 +14,9 @@ mod memory;
 
 use cpu::Cpu;
 use instruction::Instruction;
+
+const WIDTH: usize = 160;
+const HEIGHT: usize = 144;
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -29,7 +34,16 @@ fn main() -> io::Result<()> {
 
     let mut cpu = Cpu::new(binary);
 
-    loop {
+    let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
+    let mut window = Window::new(
+        "rust Gameboy",
+        WIDTH,
+        HEIGHT,
+        WindowOptions::default(),
+    ).unwrap_or_else(|e| { panic!("{}", e); });
+    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+
+    while window.is_open() && !window.is_key_down(Key::Escape) {
         let byte = match cpu.fetch() {
             Ok(byte) => byte,
             Err(()) => break,
@@ -44,6 +58,8 @@ fn main() -> io::Result<()> {
             debug!("Unsupport instruction {:#x}", byte);
             break;
         }
+
+        window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
     }
 
     debug!("{}", cpu.dump());
