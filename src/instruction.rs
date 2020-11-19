@@ -49,7 +49,7 @@ pub enum Target {
     D8
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub enum Condition {
     NotZero,
     Zero,
@@ -291,6 +291,48 @@ impl Instruction {
             Instruction::XOR(t) => if t == &Target::D8 { 2 } else { 1 },
             Instruction::OR(t) =>  if t == &Target::D8 { 2 } else { 1 },
             Instruction::CMP(t) => if t == &Target::D8 { 2 } else { 1 },
+        }
+    }
+
+    pub fn clock(&self) -> u32 {
+        // return clock of instruction, default non-taken action
+        match self {
+            Instruction::NOP => 4,
+            Instruction::JP => 12,
+            Instruction::DI => 4,
+            Instruction::LDIMM16(_) => 12,
+            Instruction::LD16A => 16,
+            Instruction::LDA16 => 16,
+            Instruction::LDIMM8(t) => if t == &Target::HL { 12 } else { 8 },
+            Instruction::LD8A => 12,
+            Instruction::LDA8 => 12,
+            Instruction::LDRR(s, t) =>
+                if s == &Target::HL || t == &Target::HL {
+                    8
+                } else {
+                    4
+                },
+            Instruction::CALL(_) => 12,
+            Instruction::RET(_) => 8,
+            Instruction::PUSH(_) => 16,
+            Instruction::POP(_)  => 12,
+            Instruction::JR(_) => 8,
+            Instruction::INC16(_) => 8,
+            Instruction::DEC16(_) => 8,
+            Instruction::INC8(t) | Instruction::DEC8(t) =>
+                if t == &Target::HL {
+                    12
+                } else {
+                    4
+                },
+            Instruction::ADD(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
+            Instruction::ADC(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
+            Instruction::SUB(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
+            Instruction::SBC(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
+            Instruction::AND(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
+            Instruction::XOR(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
+            Instruction::OR(t) =>  if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
+            Instruction::CMP(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
         }
     }
 }
