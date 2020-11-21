@@ -526,6 +526,13 @@ impl Cpu {
                 self.regs.f.half_carry = (0x0f & self.regs.a) > (0x0f & value);
                 self.regs.f.carry = self.regs.a < value;
             }
+            Instruction::RST(addr) => {
+                // note that PC is added in the fetch step
+                // so RST will store PC+1, instead of PC.
+                self.store(self.sp-1, 16, self.pc.wrapping_add(1))?;
+                self.sp -= 2;
+                self.pc = addr;
+            }
         }
         Ok(len)
     }

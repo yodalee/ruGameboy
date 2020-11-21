@@ -27,6 +27,7 @@ pub enum Instruction {
     XOR(Target),
     OR(Target),
     CMP(Target),
+    RST(u16),
 }
 
 type Source = Target;
@@ -258,6 +259,14 @@ impl Instruction {
             0xbe => Some(Instruction::CMP(Target::HL)),
             0xbf => Some(Instruction::CMP(Target::A)),
             0xfe => Some(Instruction::CMP(Target::D8)),
+            0xc7 => Some(Instruction::RST(0x00)),
+            0xcf => Some(Instruction::RST(0x08)),
+            0xd7 => Some(Instruction::RST(0x10)),
+            0xdf => Some(Instruction::RST(0x18)),
+            0xe7 => Some(Instruction::RST(0x20)),
+            0xef => Some(Instruction::RST(0x28)),
+            0xf7 => Some(Instruction::RST(0x30)),
+            0xff => Some(Instruction::RST(0x38)),
             _ => None
         }
     }
@@ -291,6 +300,7 @@ impl Instruction {
             Instruction::XOR(t) => if t == &Target::D8 { 2 } else { 1 },
             Instruction::OR(t) =>  if t == &Target::D8 { 2 } else { 1 },
             Instruction::CMP(t) => if t == &Target::D8 { 2 } else { 1 },
+            Instruction::RST(_) => 0,
         }
     }
 
@@ -333,6 +343,7 @@ impl Instruction {
             Instruction::XOR(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
             Instruction::OR(t) =>  if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
             Instruction::CMP(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
+            Instruction::RST(_) => 16,
         }
     }
 }
