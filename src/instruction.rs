@@ -1,7 +1,7 @@
 #[derive(Debug)]
 pub enum Instruction {
     NOP,
-    JP,
+    JP(Condition),
     DI,
     LDIMM16(Target),
     LD16A,
@@ -63,7 +63,11 @@ impl Instruction {
     pub fn from_byte(byte: u8) -> Option<Instruction> {
         match byte {
             0x00 => Some(Instruction::NOP),
-            0xc3 => Some(Instruction::JP),
+            0xc2 => Some(Instruction::JP(Condition::NotZero)),
+            0xc3 => Some(Instruction::JP(Condition::Always)),
+            0xca => Some(Instruction::JP(Condition::Zero)),
+            0xd2 => Some(Instruction::JP(Condition::NotCarry)),
+            0xda => Some(Instruction::JP(Condition::Carry)),
             0xf3 => Some(Instruction::DI),
             0x01 => Some(Instruction::LDIMM16(Target::BC)),
             0x11 => Some(Instruction::LDIMM16(Target::DE)),
@@ -274,7 +278,7 @@ impl Instruction {
     pub fn len(&self) -> u16 {
         match self {
             Instruction::NOP => 1,
-            Instruction::JP => 0,
+            Instruction::JP(_) => 3,
             Instruction::DI => 1,
             Instruction::LDIMM16(_) => 3,
             Instruction::LD16A => 3,
@@ -308,7 +312,7 @@ impl Instruction {
         // return clock of instruction, default non-taken action
         match self {
             Instruction::NOP => 4,
-            Instruction::JP => 12,
+            Instruction::JP(_) => 12,
             Instruction::DI => 4,
             Instruction::LDIMM16(_) => 12,
             Instruction::LD16A => 16,

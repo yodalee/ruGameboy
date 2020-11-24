@@ -38,9 +38,19 @@ impl Cpu {
         let len = inst.len();
         match inst {
             Instruction::NOP => {},
-            Instruction::JP => {
-                let addr = self.load(self.pc + 1, 16)?;
-                self.pc = addr;
+            Instruction::JP(condition) => {
+                let should_jump = match condition {
+                    Condition::NotZero => !self.regs.f.zero,
+                    Condition::Zero => self.regs.f.zero,
+                    Condition::NotCarry => !self.regs.f.carry,
+                    Condition::Carry => self.regs.f.carry,
+                    Condition::Always => true,
+                };
+                if should_jump {
+                    let addr = self.load(self.pc + 1, 16)?;
+                    self.pc = addr;
+                    return Ok(0);
+                }
             },
             Instruction::DI => {
                 // disable interrupt, since we have no interrupt yet
