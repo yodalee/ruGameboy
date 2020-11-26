@@ -105,7 +105,6 @@ impl fmt::Display for Register {
 
 impl fmt::Display for FlagRegister {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let output = String::new();
         write!(f, "Z {} SUB {} HC {} C {}",
                     if self.zero { 1 } else { 0 },
                     if self.subtract { 1 } else { 0 },

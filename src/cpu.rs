@@ -4,6 +4,11 @@ use crate::register::Register;
 use crate::instruction::{Instruction, Target, Condition};
 use crate::bus::Bus;
 
+enum DataSize {
+    Byte,
+    Word,
+}
+
 pub struct Cpu {
     regs: Register,
     sp: u16,
@@ -22,15 +27,21 @@ impl Cpu {
     }
 
     pub fn fetch(&self) -> Result<u16, ()> {
-        self.bus.load(self.pc, 8)
+        self.load(self.pc, DataSize::Word)
     }
 
-    pub fn load(&self, addr: u16, size: u16) -> Result<u16, ()> {
-        self.bus.load(addr, size)
+    fn load(&self, addr: u16, size: DataSize) -> Result<u16, ()> {
+        match size {
+            DataSize::Byte => self.bus.load8(addr).map(|v| v as u16),
+            DataSize::Word => self.bus.load16(addr),
+        }
     }
 
-    pub fn store(&mut self, addr: u16, size: u16, value: u16) -> Result<(), ()> {
-        self.bus.store(addr, size, value)
+    fn store(&mut self, addr: u16, size: DataSize, value: u16) -> Result<(), ()> {
+        match size {
+            DataSize::Byte => self.bus.store8(addr, value as u8),
+            DataSize::Word => self.bus.store16(addr, value),
+        }
     }
 
     pub fn execute(&mut self, inst: Instruction) -> Result<u16, ()> {
@@ -47,7 +58,7 @@ impl Cpu {
                     Condition::Always => true,
                 };
                 if should_jump {
-                    let addr = self.load(self.pc + 1, 16)?;
+                    let addr = self.load(self.pc + 1, DataSize::Word)?;
                     self.pc = addr;
                     return Ok(0);
                 }
@@ -56,7 +67,7 @@ impl Cpu {
                 // disable interrupt, since we have no interrupt yet
             }
             Instruction::LDIMM16(target) => {
-                let imm = self.load(self.pc + 1, 16)?;
+                let imm = self.load(self.pc + 1, DataSize::Word)?;
                 match &target {
                     &Target::BC => self.regs.set_bc(imm),
                     &Target::DE => self.regs.set_de(imm),
@@ -69,15 +80,15 @@ impl Cpu {
                 }
             }
             Instruction::LD16A => {
-                let addr = self.load(self.pc + 1, 16)?;
-                self.store(addr, 8, self.regs.a as u16);
+                let addr = self.load(self.pc + 1, DataSize::Word)?;
+                self.store(addr, DataSize::Byte, self.regs.a as u16)?;
             }
             Instruction::LDA16 => {
-                let addr = self.load(self.pc + 1, 16)?;
-                self.regs.a = self.load(addr, 8)? as u8;
+                let addr = self.load(self.pc + 1, DataSize::Word)?;
+                self.regs.a = self.load(addr, DataSize::Byte)? as u8;
             }
             Instruction::LDIMM8(target) => {
-                let imm = self.load(self.pc + 1, 8)? as u8;
+                let imm = self.load(self.pc + 1, DataSize::Byte)? as u8;
                 match target {
                     Target::A => self.regs.a = imm,
                     Target::B => self.regs.b = imm,
@@ -86,7 +97,7 @@ impl Cpu {
                     Target::E => self.regs.e = imm,
                     Target::H => self.regs.h = imm,
                     Target::L => self.regs.l = imm,
-                    Target::HL => self.store(self.regs.get_hl(), 8, imm as u16)?,
+                    Target::HL => self.store(self.regs.get_hl(), DataSize::Word, imm as u16)?,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -94,12 +105,12 @@ impl Cpu {
                 }
             }
             Instruction::LD8A => {
-                let addr = 0xff00 + (self.load(self.pc + 1, 8)?);
-                self.store(addr, 8, self.regs.a as u16);
+                let addr = 0xff00 + (self.load(self.pc + 1, DataSize::Byte)?);
+                self.store(addr, DataSize::Byte, self.regs.a as u16)?;
             }
             Instruction::LDA8 => {
-                let addr = 0xff00 + (self.load(self.pc + 1, 8)?);
-                self.regs.a = self.load(addr, 8)? as u8;
+                let addr = 0xff00 + (self.load(self.pc + 1, DataSize::Byte)?);
+                self.regs.a = self.load(addr, DataSize::Byte)? as u8;
             }
             Instruction::LDRR(source, target) => {
                 match (&source, &target) {
@@ -112,7 +123,7 @@ impl Cpu {
                     (&Target::E,  &Target::B) => self.regs.b = self.regs.e,
                     (&Target::H,  &Target::B) => self.regs.b = self.regs.h,
                     (&Target::L,  &Target::B) => self.regs.b = self.regs.l,
-                    (&Target::HL, &Target::B) => self.regs.b = self.load(self.regs.get_hl(), 8)? as u8,
+                    (&Target::HL, &Target::B) => self.regs.b = self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     (&Target::A,  &Target::B) => self.regs.b = self.regs.a,
                     (&Target::B,  &Target::C) => self.regs.c = self.regs.b,
                     (&Target::C,  &Target::C) => self.regs.c = self.regs.c,
@@ -120,7 +131,7 @@ impl Cpu {
                     (&Target::E,  &Target::C) => self.regs.c = self.regs.e,
                     (&Target::H,  &Target::C) => self.regs.c = self.regs.h,
                     (&Target::L,  &Target::C) => self.regs.c = self.regs.l,
-                    (&Target::HL, &Target::C) => self.regs.c = self.load(self.regs.get_hl(), 8)? as u8,
+                    (&Target::HL, &Target::C) => self.regs.c = self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     (&Target::A,  &Target::C) => self.regs.c = self.regs.a,
                     (&Target::B,  &Target::D) => self.regs.d = self.regs.b,
                     (&Target::C,  &Target::D) => self.regs.d = self.regs.c,
@@ -128,7 +139,7 @@ impl Cpu {
                     (&Target::E,  &Target::D) => self.regs.d = self.regs.e,
                     (&Target::H,  &Target::D) => self.regs.d = self.regs.h,
                     (&Target::L,  &Target::D) => self.regs.d = self.regs.l,
-                    (&Target::HL, &Target::D) => self.regs.d = self.load(self.regs.get_hl(), 8)? as u8,
+                    (&Target::HL, &Target::D) => self.regs.d = self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     (&Target::A,  &Target::D) => self.regs.d = self.regs.a,
                     (&Target::B,  &Target::E) => self.regs.e = self.regs.b,
                     (&Target::C,  &Target::E) => self.regs.e = self.regs.c,
@@ -136,7 +147,7 @@ impl Cpu {
                     (&Target::E,  &Target::E) => self.regs.e = self.regs.e,
                     (&Target::H,  &Target::E) => self.regs.e = self.regs.h,
                     (&Target::L,  &Target::E) => self.regs.e = self.regs.l,
-                    (&Target::HL, &Target::E) => self.regs.e = self.load(self.regs.get_hl(), 8)? as u8,
+                    (&Target::HL, &Target::E) => self.regs.e = self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     (&Target::A,  &Target::E) => self.regs.e = self.regs.a,
                     (&Target::B,  &Target::H) => self.regs.h = self.regs.b,
                     (&Target::C,  &Target::H) => self.regs.h = self.regs.c,
@@ -144,7 +155,7 @@ impl Cpu {
                     (&Target::E,  &Target::H) => self.regs.h = self.regs.e,
                     (&Target::H,  &Target::H) => self.regs.h = self.regs.h,
                     (&Target::L,  &Target::H) => self.regs.h = self.regs.l,
-                    (&Target::HL, &Target::H) => self.regs.h = self.load(self.regs.get_hl(), 8)? as u8,
+                    (&Target::HL, &Target::H) => self.regs.h = self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     (&Target::A,  &Target::H) => self.regs.h = self.regs.a,
                     (&Target::B,  &Target::L) => self.regs.l = self.regs.b,
                     (&Target::C,  &Target::L) => self.regs.l = self.regs.c,
@@ -152,31 +163,31 @@ impl Cpu {
                     (&Target::E,  &Target::L) => self.regs.l = self.regs.e,
                     (&Target::H,  &Target::L) => self.regs.l = self.regs.h,
                     (&Target::L,  &Target::L) => self.regs.l = self.regs.l,
-                    (&Target::HL, &Target::L) => self.regs.l = self.load(self.regs.get_hl(), 8)? as u8,
+                    (&Target::HL, &Target::L) => self.regs.l = self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     (&Target::A,  &Target::L) => self.regs.l = self.regs.a,
 
-                    (&Target::A, &Target::BC) => self.store(self.regs.get_bc(), 8, self.regs.a as u16)?,
-                    (&Target::A, &Target::DE) => self.store(self.regs.get_de(), 8, self.regs.a as u16)?,
+                    (&Target::A, &Target::BC) => self.store(self.regs.get_bc(), DataSize::Byte, self.regs.a as u16)?,
+                    (&Target::A, &Target::DE) => self.store(self.regs.get_de(), DataSize::Byte, self.regs.a as u16)?,
                     (&Target::A, &Target::HLINC) => {
-                        self.store(self.regs.get_hl(), 8, self.regs.a as u16)?;
+                        self.store(self.regs.get_hl(), DataSize::Byte, self.regs.a as u16)?;
                         self.regs.inc_hl();
                     },
                     (&Target::A, &Target::HLDEC) => {
-                        self.store(self.regs.get_hl(), 8, self.regs.a as u16)?;
+                        self.store(self.regs.get_hl(), DataSize::Byte, self.regs.a as u16)?;
                         self.regs.dec_hl();
                     },
                     (&Target::BC, &Target::A) => {
-                        self.regs.a = self.load(self.regs.get_bc(), 8)? as u8;
+                        self.regs.a = self.load(self.regs.get_bc(), DataSize::Byte)? as u8;
                     },
                     (&Target::DE, &Target::A) => {
-                        self.regs.a = self.load(self.regs.get_de(), 8)? as u8;
+                        self.regs.a = self.load(self.regs.get_de(), DataSize::Byte)? as u8;
                     },
                     (&Target::HLINC, &Target::A) => {
-                        self.regs.a = self.load(self.regs.get_hl(), 8)? as u8;
+                        self.regs.a = self.load(self.regs.get_hl(), DataSize::Byte)? as u8;
                         self.regs.inc_hl();
                     },
                     (&Target::HLDEC, &Target::A) => {
-                        self.regs.a = self.load(self.regs.get_hl(), 8)? as u8;
+                        self.regs.a = self.load(self.regs.get_hl(), DataSize::Byte)? as u8;
                         self.regs.dec_hl();
                     },
                     (_, _) => {
@@ -194,8 +205,8 @@ impl Cpu {
                     Condition::Always => true,
                 };
                 if should_call {
-                    let addr = self.load(self.pc + 1, 16)?;
-                    self.store(self.sp-1, 16, self.pc + 2);
+                    let addr = self.load(self.pc + 1, DataSize::Word)?;
+                    self.store(self.sp-1, DataSize::Word, self.pc + 2)?;
                     self.sp -= 2;
                     self.pc = addr;
                     return Ok(0);
@@ -210,7 +221,7 @@ impl Cpu {
                     Condition::Always => true,
                 };
                 if should_ret {
-                    self.pc = self.load(self.sp + 1, 16)?;
+                    self.pc = self.load(self.sp + 1, DataSize::Word)?;
                     self.sp += 2;
                 }
             }
@@ -225,11 +236,11 @@ impl Cpu {
                         return Err(());
                     }
                 };
-                self.store(self.sp-1, 16, value);
+                self.store(self.sp-1, DataSize::Word, value)?;
                 self.sp -= 2;
             }
             Instruction::POP(target) => {
-                let value = self.load(self.sp+1, 16)?;
+                let value = self.load(self.sp+1, DataSize::Word)?;
                 match target {
                     Target::BC => self.regs.set_bc(value),
                     Target::DE => self.regs.set_de(value),
@@ -251,7 +262,7 @@ impl Cpu {
                     Condition::Always => true,
                 };
                 if should_jump {
-                    let offset = self.load(self.pc + 1, 8)? as i8;
+                    let offset = self.load(self.pc + 1, DataSize::Byte)? as i8;
                     self.pc = self.pc.wrapping_add(offset as u16);
                 }
             }
@@ -287,7 +298,7 @@ impl Cpu {
                     Target::D  => self.regs.d,
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::L  => self.regs.l,
 
                     _ => {
@@ -296,7 +307,7 @@ impl Cpu {
                     }
                 };
                 self.regs.f.subtract = false;
-                self.regs.f.half_carry = ((value & 0x0f) == 0x0f);
+                self.regs.f.half_carry = (value & 0x0f) == 0x0f;
                 value = value.wrapping_add(1);
                 self.regs.f.zero = value == 0;
                 // note that we have to update regs.a and sum after check other flag
@@ -307,7 +318,7 @@ impl Cpu {
                     Target::D  => self.regs.d = value,
                     Target::E  => self.regs.e = value,
                     Target::H  => self.regs.h = value,
-                    Target::HL => self.store(self.regs.get_hl(), 8, value as u16)?,
+                    Target::HL => self.store(self.regs.get_hl(), DataSize::Byte, value as u16)?,
                     Target::L  => self.regs.l = value,
 
                     _ => {
@@ -324,7 +335,7 @@ impl Cpu {
                     Target::D  => self.regs.d,
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::L  => self.regs.l,
 
                     _ => {
@@ -333,7 +344,7 @@ impl Cpu {
                     }
                 };
                 self.regs.f.subtract = true;
-                self.regs.f.half_carry = ((value & 0x0f) == 0x00);
+                self.regs.f.half_carry = (value & 0x0f) == 0x00;
                 value = value.wrapping_sub(1);
                 self.regs.f.zero = value == 0;
                 // note that we have to update regs.a and sum after check other flag
@@ -344,7 +355,7 @@ impl Cpu {
                     Target::D  => self.regs.d = value,
                     Target::E  => self.regs.e = value,
                     Target::H  => self.regs.h = value,
-                    Target::HL => self.store(self.regs.get_hl(), 8, value as u16)?,
+                    Target::HL => self.store(self.regs.get_hl(), DataSize::Byte, value as u16)?,
                     Target::L  => self.regs.l = value,
 
                     _ => {
@@ -361,9 +372,9 @@ impl Cpu {
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
                     Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
+                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -384,9 +395,9 @@ impl Cpu {
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
                     Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
+                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -408,9 +419,9 @@ impl Cpu {
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
                     Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
+                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -432,9 +443,9 @@ impl Cpu {
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
                     Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
+                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -457,9 +468,9 @@ impl Cpu {
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
                     Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
+                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -479,9 +490,9 @@ impl Cpu {
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
                     Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
+                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -501,9 +512,9 @@ impl Cpu {
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
                     Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
+                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -523,9 +534,9 @@ impl Cpu {
                     Target::E  => self.regs.e,
                     Target::H  => self.regs.h,
                     Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), 8)? as u8,
+                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
                     Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, 8)? as u8,
+                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
                     _ => {
                         info!("Invalid target for instruction {:?}", target);
                         return Err(());
@@ -539,7 +550,7 @@ impl Cpu {
             Instruction::RST(addr) => {
                 // note that PC is added in the fetch step
                 // so RST will store PC+1, instead of PC.
-                self.store(self.sp-1, 16, self.pc.wrapping_add(1))?;
+                self.store(self.sp-1, DataSize::Word, self.pc.wrapping_add(1))?;
                 self.sp -= 2;
                 self.pc = addr;
             }
@@ -552,7 +563,7 @@ impl Cpu {
         output.push_str(&format!("Register {{ {} }}\n", self.regs));
         output.push_str(&format!("SP = {:#x}\t", self.sp));
         output.push_str(&format!("pc = {:#x}\t", self.pc));
-        let byte = self.load(self.pc, 8).unwrap() as u8;
+        let byte = self.load(self.pc, DataSize::Byte).unwrap() as u8;
         output.push_str(&format!("byte = {:#x}\t", byte));
         output.push_str(&format!("inst = {:?}", Instruction::from_byte(byte)));
         output
