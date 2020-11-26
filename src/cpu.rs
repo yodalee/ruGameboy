@@ -1,3 +1,5 @@
+use log::{debug, info};
+
 use crate::register::Register;
 use crate::instruction::{Instruction, Target, Condition};
 use crate::bus::Bus;
@@ -32,9 +34,7 @@ impl Cpu {
     }
 
     pub fn execute(&mut self, inst: Instruction) -> Result<u16, ()> {
-        /* debug
-        println!("{}", self.dump());
-        */
+        debug!("{}", self.dump());
         let len = inst.len();
         match inst {
             Instruction::NOP => {},
@@ -63,7 +63,7 @@ impl Cpu {
                     &Target::HL => self.regs.set_hl(imm),
                     &Target::SP => self.sp = imm,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 }
@@ -88,7 +88,7 @@ impl Cpu {
                     Target::L => self.regs.l = imm,
                     Target::HL => self.store(self.regs.get_hl(), 8, imm as u16)?,
                     _ => {
-                        dbg!("Invalid target for instruction {:?}, target");
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 }
@@ -180,7 +180,7 @@ impl Cpu {
                         self.regs.dec_hl();
                     },
                     (_, _) => {
-                        dbg!(format!("Invalid target for instruction {:?} {:?}", source, target));
+                        info!("Invalid target for instruction {:?} {:?}", source, target);
                         return Err(());
                     }
                 }
@@ -221,7 +221,7 @@ impl Cpu {
                     Target::HL => self.regs.get_hl(),
                     Target::AF => self.regs.get_af(),
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -236,7 +236,7 @@ impl Cpu {
                     Target::HL => self.regs.set_hl(value),
                     Target::AF => self.regs.set_af(value),
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -262,7 +262,7 @@ impl Cpu {
                     Target::HL => self.regs.set_hl(self.regs.get_hl().wrapping_add(1)),
                     Target::SP => self.sp += 1,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 }
@@ -274,7 +274,7 @@ impl Cpu {
                     Target::HL => self.regs.set_hl(self.regs.get_hl().wrapping_sub(1)),
                     Target::SP => self.sp -= 1,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 }
@@ -291,7 +291,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
 
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -311,7 +311,7 @@ impl Cpu {
                     Target::L  => self.regs.l = value,
 
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 }
@@ -328,7 +328,7 @@ impl Cpu {
                     Target::L  => self.regs.l,
 
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -348,7 +348,7 @@ impl Cpu {
                     Target::L  => self.regs.l = value,
 
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 }
@@ -365,7 +365,7 @@ impl Cpu {
                     Target::A  => self.regs.a,
                     Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -388,7 +388,7 @@ impl Cpu {
                     Target::A  => self.regs.a,
                     Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -412,7 +412,7 @@ impl Cpu {
                     Target::A  => self.regs.a,
                     Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -436,7 +436,7 @@ impl Cpu {
                     Target::A  => self.regs.a,
                     Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -461,7 +461,7 @@ impl Cpu {
                     Target::A  => self.regs.a,
                     Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -483,7 +483,7 @@ impl Cpu {
                     Target::A  => self.regs.a,
                     Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -505,7 +505,7 @@ impl Cpu {
                     Target::A  => self.regs.a,
                     Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };
@@ -527,7 +527,7 @@ impl Cpu {
                     Target::A  => self.regs.a,
                     Target::D8 => self.load(self.pc + 1, 8)? as u8,
                     _ => {
-                        dbg!(format!("Invalid target for instruction {:?}", target));
+                        info!("Invalid target for instruction {:?}", target);
                         return Err(());
                     }
                 };

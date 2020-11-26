@@ -1,8 +1,8 @@
-
 use std::env;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
+use log::{error, debug};
 
 mod cpu;
 mod register;
@@ -14,11 +14,13 @@ use cpu::Cpu;
 use instruction::Instruction;
 
 fn main() -> io::Result<()> {
+    env_logger::init();
 
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 2 {
-        panic!("Usage: ruGameboy <binary.gb>");
+        error!("Usage: ruGameboy < binary.gb>");
+        std::process::exit(1);
     }
 
     let mut file = File::open(&args[1])?;
@@ -39,12 +41,12 @@ fn main() -> io::Result<()> {
                 Err(()) => break,
             }
         } else {
-            dbg!(&format!("Unsupport instruction {:#x}", byte));
+            debug!("Unsupport instruction {:#x}", byte);
             break;
         }
     }
 
-    println!("{}", cpu.dump());
+    debug!("{}", cpu.dump());
 
     Ok(())
 }
