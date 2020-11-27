@@ -12,8 +12,7 @@ impl Memory {
     }
 
     pub fn new_empty(size: usize) -> Self {
-        let mut memory = vec![];
-        memory.resize(size, 0);
+        let memory = vec![0; size];
         Self {
             memory: memory,
         }

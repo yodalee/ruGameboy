@@ -7,6 +7,7 @@ use log::{error, debug};
 use minifb::{Key, Window, WindowOptions};
 
 mod cpu;
+mod gpu;
 mod register;
 mod instruction;
 mod bus;
