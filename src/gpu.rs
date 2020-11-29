@@ -1,6 +1,8 @@
+use log::{debug};
 use crate::bus::{Device, VRAM_START, VRAM_END};
 
-enum GpuMode {
+#[derive(PartialEq)]
+pub enum GpuMode {
     /// First scanline mode, render data from OAM memory
     ScanlineOAM,
     /// Second scanline mode, render data from VRAM (tile) memory
@@ -86,7 +88,7 @@ pub struct Gpu {
     /// object palette 1
     pub ob1_palette: u8,
     /// current display mode
-    mode: GpuMode,
+    pub mode: GpuMode,
     /// SCY: background Y position
     pub scy: u8,
     /// SCX: background X position
@@ -140,6 +142,7 @@ impl Gpu {
                 self.clock -= 456;
                 self.line += 1;
                 if self.line >= 153 {
+                    self.line = 0;
                     self.mode = GpuMode::ScanlineOAM;
                 }
             },

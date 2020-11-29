@@ -14,11 +14,9 @@ mod register;
 mod instruction;
 mod bus;
 mod memory;
+mod vm;
 
-use cpu::Cpu;
-
-const WIDTH: usize = 160;
-const HEIGHT: usize = 144;
+use vm::{Vm, WIDTH, HEIGHT};
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -34,9 +32,7 @@ fn main() -> io::Result<()> {
     let mut binary = Vec::new();
     file.read_to_end(&mut binary)?;
 
-    let mut cpu = Cpu::new(binary);
-
-    let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
+    let mut vm = Vm::new(binary);
     let mut window = Window::new(
         "rust Gameboy",
         WIDTH,
@@ -46,14 +42,11 @@ fn main() -> io::Result<()> {
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if cpu.step().is_err() {
+        if vm.run().is_err() {
             break;
         }
-
-        window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
+        window.update_with_buffer(&vm.buffer, WIDTH, HEIGHT).unwrap();
     }
-
-    debug!("{}", cpu.dump());
-
+    vm.dump();
     Ok(())
 }
