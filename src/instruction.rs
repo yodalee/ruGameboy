@@ -339,7 +339,7 @@ impl Instruction {
         }
     }
 
-    pub fn clock(&self) -> u32 {
+    pub fn clock(&self) -> u64 {
         // return clock of instruction, default non-taken action
         match self {
             Instruction::NOP => 4,
@@ -654,7 +654,7 @@ impl CBInstruction {
         2
     }
 
-    pub fn clock(&self) -> u32 {
+    pub fn clock(&self) -> u64 {
         match &self {
             CBInstruction::RLC(target)      |
             CBInstruction::RRC(target)      |

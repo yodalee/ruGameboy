@@ -93,16 +93,31 @@ impl Cpu {
         }
     }
 
-    pub fn execute(&mut self, inst: Instruction) -> Result<u16, ()> {
+    /// run single command in CPU return the clock length
+    pub fn step(&mut self) -> Result<u64, ()> {
+        let byte = self.fetch()?;
+
+        if let Some(inst) = Instruction::from_byte(byte as u8) {
+            let (offset, clock) = self.execute(inst)?;
+            self.pc += offset;
+            Ok(clock)
+        } else {
+            debug!("Unsupport instruction {:#x}", byte as u8);
+            Err(())
+        }
+    }
+
+    pub fn execute(&mut self, inst: Instruction) -> Result<(u16, u64), ()> {
         debug!("{}", self.dump());
         let len = inst.len();
+        let clock = inst.clock();
         match inst {
             Instruction::NOP => {},
             Instruction::JP(condition) => {
                 if self.check_condition(&condition) {
                     let addr = self.load(self.pc + 1, DataSize::Word)?;
                     self.pc = addr;
-                    return Ok(0);
+                    return Ok((0, 16));
                 }
             },
             Instruction::DI => {
@@ -242,13 +257,15 @@ impl Cpu {
                     self.store(self.sp-1, DataSize::Word, self.pc + 2)?;
                     self.sp -= 2;
                     self.pc = addr;
-                    return Ok(0);
+                    return Ok((0, 24));
                 }
             }
             Instruction::RET(condition) => {
                 if self.check_condition(&condition) {
                     self.pc = self.load(self.sp + 1, DataSize::Word)?;
                     self.sp += 2;
+                    let clock = if condition == Condition::Always { 16 } else { 20 };
+                    return Ok((len, clock));
                 }
             }
             Instruction::PUSH(target) => {
@@ -283,6 +300,7 @@ impl Cpu {
                 if self.check_condition(&condition) {
                     let offset = self.load(self.pc + 1, DataSize::Byte)? as i8;
                     self.pc = self.pc.wrapping_add(offset as u16);
+                    return Ok((len, 12));
                 }
             }
             Instruction::INC16(target) => {
@@ -416,12 +434,13 @@ impl Cpu {
                 self.regs.f.carry = !self.regs.f.carry;
             }
         }
-        Ok(len)
+        Ok((len, clock))
     }
 
-    pub fn execute_cb(&mut self, inst: CBInstruction) -> Result<u16, ()> {
+    pub fn execute_cb(&mut self, inst: CBInstruction) -> Result<(u16, u64), ()> {
         debug!("{}", self.dump());
         let len = inst.len();
+        let clock = inst.clock();
         match inst {
             CBInstruction::RLC(target) => {
                 // rotate target left
@@ -519,7 +538,7 @@ impl Cpu {
                 self.set_r8(&target, value | (1 << offset))?;
             }
         }
-        Ok(len)
+        Ok((len, clock))
     }
 
     pub fn dump(&self) -> String {

@@ -13,7 +13,6 @@ mod bus;
 mod memory;
 
 use cpu::Cpu;
-use instruction::Instruction;
 
 const WIDTH: usize = 160;
 const HEIGHT: usize = 144;
@@ -44,18 +43,7 @@ fn main() -> io::Result<()> {
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        let byte = match cpu.fetch() {
-            Ok(byte) => byte,
-            Err(()) => break,
-        };
-
-        if let Some(inst) = Instruction::from_byte(byte as u8) {
-            match cpu.execute(inst) {
-                Ok(offset) => cpu.pc += offset,
-                Err(()) => break,
-            }
-        } else {
-            debug!("Unsupport instruction {:#x}", byte);
+        if cpu.step().is_err() {
             break;
         }
 
