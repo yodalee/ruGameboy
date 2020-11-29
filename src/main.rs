@@ -4,6 +4,8 @@ use std::io;
 use std::io::prelude::*;
 use log::{error, debug};
 
+#[macro_use]
+extern crate num_derive;
 use minifb::{Key, Window, WindowOptions};
 
 mod cpu;
