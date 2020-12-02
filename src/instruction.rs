@@ -31,6 +31,8 @@ pub enum Instruction {
     OR(Target),
     CMP(Target),
     RST(u16),
+    CPL,
+    CCF,
 }
 
 type Source = Target;
@@ -277,6 +279,8 @@ impl Instruction {
             0xff => Some(Instruction::RST(0x38)),
             0xe2 => Some(Instruction::LDCA),
             0xf2 => Some(Instruction::LDAC),
+            0x2f => Some(Instruction::CPL),
+            0x3f => Some(Instruction::CCF),
             _ => None
         }
     }
@@ -314,6 +318,8 @@ impl Instruction {
             Instruction::OR(t) =>  if t == &Target::D8 { 2 } else { 1 },
             Instruction::CMP(t) => if t == &Target::D8 { 2 } else { 1 },
             Instruction::RST(_) => 0,
+            Instruction::CPL => 1,
+            Instruction::CCF => 1,
         }
     }
 
@@ -360,6 +366,8 @@ impl Instruction {
             Instruction::OR(t) =>  if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
             Instruction::CMP(t) => if t == &Target::D8 || t == &Target::HL { 2 } else { 1 },
             Instruction::RST(_) => 16,
+            Instruction::CPL => 4,
+            Instruction::CCF => 4,
         }
     }
 }

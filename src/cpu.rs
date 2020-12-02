@@ -565,6 +565,16 @@ impl Cpu {
                 self.sp -= 2;
                 self.pc = addr;
             }
+            Instruction::CPL => {
+                self.regs.a = !self.regs.a;
+                self.regs.f.subtract = true;
+                self.regs.f.half_carry = true;
+            }
+            Instruction::CCF => {
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = !self.regs.f.carry;
+            }
         }
         Ok(len)
     }
