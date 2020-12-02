@@ -66,6 +66,9 @@ impl Cpu {
             Instruction::DI => {
                 // disable interrupt, since we have no interrupt yet
             }
+            Instruction::EI => {
+                // enable interrupt, since we have no interrupt yet
+            }
             Instruction::LDIMM16(target) => {
                 let imm = self.load(self.pc + 1, DataSize::Word)?;
                 match &target {
