@@ -4,11 +4,13 @@ pub enum Instruction {
     JP(Condition),
     DI,
     LDIMM16(Target),
+    LDIMM8(Target),
     LD16A,
     LDA16,
-    LDIMM8(Target),
     LD8A,
     LDA8,
+    LDCA,
+    LDAC,
     LDRR(Source, Target),
     CALL(Condition),
     RET(Condition),
@@ -271,6 +273,8 @@ impl Instruction {
             0xef => Some(Instruction::RST(0x28)),
             0xf7 => Some(Instruction::RST(0x30)),
             0xff => Some(Instruction::RST(0x38)),
+            0xe2 => Some(Instruction::LDCA),
+            0xf2 => Some(Instruction::LDAC),
             _ => None
         }
     }
@@ -281,11 +285,13 @@ impl Instruction {
             Instruction::JP(_) => 3,
             Instruction::DI => 1,
             Instruction::LDIMM16(_) => 3,
+            Instruction::LDIMM8(_) => 2,
             Instruction::LD16A => 3,
             Instruction::LDA16 => 3,
-            Instruction::LDIMM8(_) => 2,
             Instruction::LD8A => 2,
             Instruction::LDA8 => 2,
+            Instruction::LDCA => 2,
+            Instruction::LDAC => 2,
             Instruction::LDRR(_, _) => 1,
             Instruction::CALL(_) => 3,
             Instruction::RET(_) => 1,
@@ -315,11 +321,13 @@ impl Instruction {
             Instruction::JP(_) => 12,
             Instruction::DI => 4,
             Instruction::LDIMM16(_) => 12,
+            Instruction::LDIMM8(t) => if t == &Target::HL { 12 } else { 8 },
             Instruction::LD16A => 16,
             Instruction::LDA16 => 16,
-            Instruction::LDIMM8(t) => if t == &Target::HL { 12 } else { 8 },
             Instruction::LD8A => 12,
             Instruction::LDA8 => 12,
+            Instruction::LDCA => 8,
+            Instruction::LDAC => 8,
             Instruction::LDRR(s, t) =>
                 if s == &Target::HL || t == &Target::HL {
                     8

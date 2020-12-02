@@ -112,6 +112,14 @@ impl Cpu {
                 let addr = 0xff00 + (self.load(self.pc + 1, DataSize::Byte)?);
                 self.regs.a = self.load(addr, DataSize::Byte)? as u8;
             }
+            Instruction::LDCA => {
+                let addr = 0xff00 + self.regs.c as u16;
+                self.store(addr, DataSize::Byte, self.regs.a as u16)?;
+            }
+            Instruction::LDAC => {
+                let addr = 0xff00 + self.regs.c as u16;
+                self.regs.a = self.load(addr, DataSize::Byte)? as u8;
+            }
             Instruction::LDRR(source, target) => {
                 match (&source, &target) {
                     (&Target::B,  &Target::A) => self.regs.a = self.regs.b,
