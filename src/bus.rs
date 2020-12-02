@@ -22,8 +22,20 @@ pub const HRAM_END:       u16 = 0xfffe;
 /// IO line, 0xff00 - 0xff7f
 #[derive(FromPrimitive)]
 enum IO {
+    P1      = 0xff00,
     SB      = 0xff01,
     SC      = 0xff02,
+    TMA     = 0xff06,
+    TCA     = 0xff07,
+    // consider move all NR line to one module
+    NR10    = 0xff10,
+    NR12    = 0xff12,
+    NR14    = 0xff14,
+    NR22    = 0xff17,
+    NR24    = 0xff19,
+    NR30    = 0xff1a,
+    NR42    = 0xff21,
+    NR44    = 0xff23,
     NR50    = 0xff24,
     NR51    = 0xff25,
     NR52    = 0xff26,
@@ -35,6 +47,8 @@ enum IO {
     BGP     = 0xff47,
     OBP0    = 0xff48,
     OBP1    = 0xff49,
+    WINY    = 0xff4a,
+    WINX    = 0xff4b,
     Dummy7f = 0xff7f,
     Int     = 0xff0f,
     IntEnb  = 0xffff,
