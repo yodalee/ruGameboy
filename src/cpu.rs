@@ -1,7 +1,7 @@
 use log::{debug, info};
 
 use crate::register::Register;
-use crate::instruction::{Instruction, Target, Condition};
+use crate::instruction::{Instruction, Target, Condition, CBInstruction};
 use crate::bus::Bus;
 
 enum DataSize {
@@ -414,6 +414,109 @@ impl Cpu {
                 self.regs.f.subtract = false;
                 self.regs.f.half_carry = false;
                 self.regs.f.carry = !self.regs.f.carry;
+            }
+        }
+        Ok(len)
+    }
+
+    pub fn execute_cb(&mut self, inst: CBInstruction) -> Result<u16, ()> {
+        debug!("{}", self.dump());
+        let len = inst.len();
+        match inst {
+            CBInstruction::RLC(target) => {
+                // rotate target left
+                let value = self.get_r8(&target)?;
+                let result = value << 1 | value >> 7;
+                self.regs.f.zero = result == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = (value & 0x80) != 0;
+                self.set_r8(&target, result)?;
+            }
+            CBInstruction::RRC(target) => {
+                // rotate target right
+                let value = self.get_r8(&target)?;
+                let result = (value >> 1) | (value << 7);
+                self.regs.f.zero = result == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = (value & 0x01) != 0;
+                self.set_r8(&target, result)?;
+            }
+            CBInstruction::RL(target) => {
+                // rotate target left through carry
+                let value = self.get_r8(&target)?;
+                let result = (value << 1) | (self.regs.f.carry as u8);
+                self.regs.f.zero = result == 0;
+                self.regs.f.half_carry = false;
+                self.regs.f.subtract = false;
+                self.regs.f.carry = (value & 0x80) != 0;
+                self.set_r8(&target, result)?;
+            }
+            CBInstruction::RR(target) => {
+                // rotate target right through carry
+                let value = self.get_r8(&target)?;
+                let result = (value >> 1) | ((self.regs.f.carry as u8) << 7);
+                self.regs.f.zero = result == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = (value & 0x01) != 0;
+                self.set_r8(&target, result)?;
+            }
+            CBInstruction::SLA(target) => {
+                // shift target left into carry
+                let value = self.get_r8(&target)?;
+                let result = value << 1;
+                self.regs.f.zero = result == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = (value & 0x80) != 0;
+                self.set_r8(&target, result)?;
+            }
+            CBInstruction::SRA(target) => {
+                // shift target right into carry, MSB not change
+                let value = self.get_r8(&target)?;
+                let result = (value >> 1) | (value & 0x80);
+                self.regs.f.zero = result == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = (value & 0x01) != 0;
+                self.set_r8(&target, result)?;
+            }
+            CBInstruction::SWAP(target) => {
+                // swap register nibble
+                let value = self.get_r8(&target)?;
+                let result = (value << 4) | (value >> 4);
+                self.regs.f.zero = result == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = false;
+                self.set_r8(&target, result)?;
+            }
+            CBInstruction::SRL(target) => {
+                // shift target right into carry, MSB to 0
+                let value = self.get_r8(&target)?;
+                let result = value >> 1;
+                self.regs.f.zero = result == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = (value & 0x01) != 0;
+                self.set_r8(&target, result)?;
+            }
+            CBInstruction::BIT(target, offset) => {
+                // shift target right into carry, MSB to 0
+                let value = (self.get_r8(&target)? >> offset) & 0x01;
+                self.regs.f.zero = value == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = true;
+            }
+            CBInstruction::RES(target, offset) => {
+                let value = self.get_r8(&target)?;
+                self.set_r8(&target, value & !(1 << offset))?;
+            }
+            CBInstruction::SET(target, offset) => {
+                let value = self.get_r8(&target)?;
+                self.set_r8(&target, value | (1 << offset))?;
             }
         }
         Ok(len)
