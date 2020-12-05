@@ -44,20 +44,62 @@ impl Cpu {
         }
     }
 
+    // helper function for command with operation on register
+    // B, C, D, E, H, L, (HL), A, d8
+    fn get_r8(&self, target: &Target) -> Result<u8, ()> {
+        match target {
+            Target::B  => Ok(self.regs.b),
+            Target::C  => Ok(self.regs.c),
+            Target::D  => Ok(self.regs.d),
+            Target::E  => Ok(self.regs.e),
+            Target::H  => Ok(self.regs.h),
+            Target::L  => Ok(self.regs.l),
+            Target::HL => Ok(self.load(self.regs.get_hl(), DataSize::Byte)? as u8),
+            Target::A  => Ok(self.regs.a),
+            Target::D8 => Ok(self.load(self.pc + 1, DataSize::Byte)? as u8),
+            _ => {
+                info!("Invalid target for instruction {:?}", target);
+                return Err(());
+            }
+        }
+    }
+
+    fn set_r8(&mut self, target: &Target, value: u8) -> Result<(), ()> {
+        match target {
+            Target::A  => self.regs.a = value,
+            Target::B  => self.regs.b = value,
+            Target::C  => self.regs.c = value,
+            Target::D  => self.regs.d = value,
+            Target::E  => self.regs.e = value,
+            Target::H  => self.regs.h = value,
+            Target::HL => self.store(self.regs.get_hl(), DataSize::Byte, value as u16)?,
+            Target::L  => self.regs.l = value,
+
+            _ => {
+                info!("Invalid target for instruction {:?}", target);
+                        return Err(());
+            }
+        }
+        Ok(())
+    }
+
+    fn check_condition(&self, condition: &Condition) -> bool {
+        match condition {
+            Condition::NotZero => !self.regs.f.zero,
+            Condition::Zero => self.regs.f.zero,
+            Condition::NotCarry => !self.regs.f.carry,
+            Condition::Carry => self.regs.f.carry,
+            Condition::Always => true,
+        }
+    }
+
     pub fn execute(&mut self, inst: Instruction) -> Result<u16, ()> {
         debug!("{}", self.dump());
         let len = inst.len();
         match inst {
             Instruction::NOP => {},
             Instruction::JP(condition) => {
-                let should_jump = match condition {
-                    Condition::NotZero => !self.regs.f.zero,
-                    Condition::Zero => self.regs.f.zero,
-                    Condition::NotCarry => !self.regs.f.carry,
-                    Condition::Carry => self.regs.f.carry,
-                    Condition::Always => true,
-                };
-                if should_jump {
+                if self.check_condition(&condition) {
                     let addr = self.load(self.pc + 1, DataSize::Word)?;
                     self.pc = addr;
                     return Ok(0);
@@ -92,20 +134,7 @@ impl Cpu {
             }
             Instruction::LDIMM8(target) => {
                 let imm = self.load(self.pc + 1, DataSize::Byte)? as u8;
-                match target {
-                    Target::A => self.regs.a = imm,
-                    Target::B => self.regs.b = imm,
-                    Target::C => self.regs.c = imm,
-                    Target::D => self.regs.d = imm,
-                    Target::E => self.regs.e = imm,
-                    Target::H => self.regs.h = imm,
-                    Target::L => self.regs.l = imm,
-                    Target::HL => self.store(self.regs.get_hl(), DataSize::Word, imm as u16)?,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                }
+                self.set_r8(&target, imm)?;
             }
             Instruction::LD8A => {
                 let addr = 0xff00 + (self.load(self.pc + 1, DataSize::Byte)?);
@@ -208,14 +237,7 @@ impl Cpu {
                 }
             }
             Instruction::CALL(condition) => {
-                let should_call = match condition {
-                    Condition::NotZero => !self.regs.f.zero,
-                    Condition::Zero => self.regs.f.zero,
-                    Condition::NotCarry => !self.regs.f.carry,
-                    Condition::Carry => self.regs.f.carry,
-                    Condition::Always => true,
-                };
-                if should_call {
+                if self.check_condition(&condition) {
                     let addr = self.load(self.pc + 1, DataSize::Word)?;
                     self.store(self.sp-1, DataSize::Word, self.pc + 2)?;
                     self.sp -= 2;
@@ -224,14 +246,7 @@ impl Cpu {
                 }
             }
             Instruction::RET(condition) => {
-                let should_ret = match condition {
-                    Condition::NotZero => !self.regs.f.zero,
-                    Condition::Zero => self.regs.f.zero,
-                    Condition::NotCarry => !self.regs.f.carry,
-                    Condition::Carry => self.regs.f.carry,
-                    Condition::Always => true,
-                };
-                if should_ret {
+                if self.check_condition(&condition) {
                     self.pc = self.load(self.sp + 1, DataSize::Word)?;
                     self.sp += 2;
                 }
@@ -265,14 +280,7 @@ impl Cpu {
                 self.sp += 2;
             }
             Instruction::JR(condition) => {
-                let should_jump = match condition {
-                    Condition::NotZero => !self.regs.f.zero,
-                    Condition::Zero => self.regs.f.zero,
-                    Condition::NotCarry => !self.regs.f.carry,
-                    Condition::Carry => self.regs.f.carry,
-                    Condition::Always => true,
-                };
-                if should_jump {
+                if self.check_condition(&condition) {
                     let offset = self.load(self.pc + 1, DataSize::Byte)? as i8;
                     self.pc = self.pc.wrapping_add(offset as u16);
                 }
@@ -302,95 +310,25 @@ impl Cpu {
                 }
             }
             Instruction::INC8(target) => {
-                let mut value = match target {
-                    Target::A  => self.regs.a,
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::L  => self.regs.l,
-
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let mut value = self.get_r8(&target)?;
                 self.regs.f.subtract = false;
                 self.regs.f.half_carry = (value & 0x0f) == 0x0f;
                 value = value.wrapping_add(1);
                 self.regs.f.zero = value == 0;
                 // note that we have to update regs.a and sum after check other flag
-                match target {
-                    Target::A  => self.regs.a = value,
-                    Target::B  => self.regs.b = value,
-                    Target::C  => self.regs.c = value,
-                    Target::D  => self.regs.d = value,
-                    Target::E  => self.regs.e = value,
-                    Target::H  => self.regs.h = value,
-                    Target::HL => self.store(self.regs.get_hl(), DataSize::Byte, value as u16)?,
-                    Target::L  => self.regs.l = value,
-
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                }
+                self.set_r8(&target, value)?;
             }
             Instruction::DEC8(target) => {
-                let mut value = match target {
-                    Target::A  => self.regs.a,
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::L  => self.regs.l,
-
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let mut value = self.get_r8(&target)?;
                 self.regs.f.subtract = true;
                 self.regs.f.half_carry = (value & 0x0f) == 0x00;
                 value = value.wrapping_sub(1);
                 self.regs.f.zero = value == 0;
                 // note that we have to update regs.a and sum after check other flag
-                match target {
-                    Target::A  => self.regs.a = value,
-                    Target::B  => self.regs.b = value,
-                    Target::C  => self.regs.c = value,
-                    Target::D  => self.regs.d = value,
-                    Target::E  => self.regs.e = value,
-                    Target::H  => self.regs.h = value,
-                    Target::HL => self.store(self.regs.get_hl(), DataSize::Byte, value as u16)?,
-                    Target::L  => self.regs.l = value,
-
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                }
+                self.set_r8(&target, value)?;
             }
             Instruction::ADD(target) => {
-                let value = match target {
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let value = self.get_r8(&target)?;
                 self.regs.f.subtract = false;
                 self.regs.f.half_carry = (0x0f & self.regs.a) + (0x0f & value) > 0x0f;
                 self.regs.f.carry = (self.regs.a as u16) + (value as u16) > 0xff;
@@ -399,21 +337,7 @@ impl Cpu {
                 self.regs.f.zero = self.regs.a == 0;
             }
             Instruction::ADC(target) => {
-                let value = match target {
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let value = self.get_r8(&target)?;
                 let carry = if self.regs.f.carry { 1 } else { 0 };
                 self.regs.f.subtract = false;
                 self.regs.f.half_carry = (0x0f & self.regs.a) + (0x0f & value) + carry > 0x0f;
@@ -423,21 +347,7 @@ impl Cpu {
                 self.regs.f.zero = self.regs.a == 0;
             }
             Instruction::SUB(target) => {
-                let value = match target {
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let value = self.get_r8(&target)?;
                 self.regs.f.subtract = true;
                 // FIXME: is half_carry and carry definition correct?
                 self.regs.f.half_carry = (0x0f & self.regs.a) > (0x0f & value);
@@ -447,21 +357,7 @@ impl Cpu {
                 self.regs.f.zero = self.regs.a == 0;
             }
             Instruction::SBC(target) => {
-                let value = match target {
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let value = self.get_r8(&target)?;
                 let carry = if self.regs.f.carry { 1 } else { 0 };
                 self.regs.f.subtract = true;
                 // FIXME: is half_carry and carry definition correct?
@@ -472,21 +368,7 @@ impl Cpu {
                 self.regs.f.zero = self.regs.a == 0;
             }
             Instruction::AND(target) => {
-                let value = match target {
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let value = self.get_r8(&target)?;
                 self.regs.a &= value;
                 self.regs.f.zero = self.regs.a == 0;
                 self.regs.f.subtract = false;
@@ -494,21 +376,7 @@ impl Cpu {
                 self.regs.f.carry = false;
             }
             Instruction::XOR(target) => {
-                let value = match target {
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let value = self.get_r8(&target)?;
                 self.regs.a ^= value;
                 self.regs.f.zero = self.regs.a == 0;
                 self.regs.f.subtract = false;
@@ -516,21 +384,7 @@ impl Cpu {
                 self.regs.f.carry = false;
             }
             Instruction::OR(target) => {
-                let value = match target {
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let value = self.get_r8(&target)?;
                 self.regs.a |= value;
                 self.regs.f.zero = self.regs.a == 0;
                 self.regs.f.subtract = false;
@@ -538,21 +392,7 @@ impl Cpu {
                 self.regs.f.carry = false;
             }
             Instruction::CMP(target) => {
-                let value = match target {
-                    Target::B  => self.regs.b,
-                    Target::C  => self.regs.c,
-                    Target::D  => self.regs.d,
-                    Target::E  => self.regs.e,
-                    Target::H  => self.regs.h,
-                    Target::L  => self.regs.l,
-                    Target::HL => self.load(self.regs.get_hl(), DataSize::Byte)? as u8,
-                    Target::A  => self.regs.a,
-                    Target::D8 => self.load(self.pc + 1, DataSize::Byte)? as u8,
-                    _ => {
-                        info!("Invalid target for instruction {:?}", target);
-                        return Err(());
-                    }
-                };
+                let value = self.get_r8(&target)?;
                 self.regs.f.zero = self.regs.a == value;
                 self.regs.f.subtract = true;
                 self.regs.f.half_carry = (0x0f & self.regs.a) > (0x0f & value);
