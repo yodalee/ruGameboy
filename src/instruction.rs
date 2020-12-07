@@ -651,7 +651,7 @@ impl CBInstruction {
     }
 
     pub fn len(&self) -> u16 {
-        2
+        1
     }
 
     pub fn clock(&self) -> u64 {

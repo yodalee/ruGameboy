@@ -95,20 +95,30 @@ impl Cpu {
 
     /// run single command in CPU return the clock length
     pub fn step(&mut self) -> Result<u64, ()> {
-        let byte = self.fetch()?;
+        debug!("{}", self.dump());
 
-        if let Some(inst) = Instruction::from_byte(byte as u8) {
-            let (offset, clock) = self.execute(inst)?;
+        let byte = self.fetch()? as u8;
+        if byte == 0xcb {
+            self.pc += 1;
+            let byte = self.fetch()? as u8;
+            // CB instruction is full, should not fail
+            let inst = CBInstruction::from_byte(byte);
+            let (offset, clock) = self.execute_cb(inst)?;
             self.pc += offset;
             Ok(clock)
         } else {
-            debug!("Unsupport instruction {:#x}", byte as u8);
-            Err(())
+            if let Some(inst) = Instruction::from_byte(byte) {
+                let (offset, clock) = self.execute(inst)?;
+                self.pc += offset;
+                Ok(clock)
+            } else {
+                debug!("Unsupport instruction {:#x}", byte as u8);
+                Err(())
+            }
         }
     }
 
     pub fn execute(&mut self, inst: Instruction) -> Result<(u16, u64), ()> {
-        debug!("{}", self.dump());
         let len = inst.len();
         let clock = inst.clock();
         match inst {
@@ -438,7 +448,6 @@ impl Cpu {
     }
 
     pub fn execute_cb(&mut self, inst: CBInstruction) -> Result<(u16, u64), ()> {
-        debug!("{}", self.dump());
         let len = inst.len();
         let clock = inst.clock();
         match inst {
@@ -547,8 +556,14 @@ impl Cpu {
         output.push_str(&format!("SP = {:#x}\t", self.sp));
         output.push_str(&format!("pc = {:#x}\t", self.pc));
         let byte = self.load(self.pc, DataSize::Byte).unwrap() as u8;
-        output.push_str(&format!("byte = {:#x}\t", byte));
-        output.push_str(&format!("inst = {:?}", Instruction::from_byte(byte)));
+        if byte == 0xcb {
+            let byte = self.load(self.pc+1, DataSize::Byte).unwrap() as u8;
+            output.push_str(&format!("byte = {:#x}\t", byte));
+            output.push_str(&format!("inst = {:?}", CBInstruction::from_byte(byte)));
+        } else {
+            output.push_str(&format!("byte = {:#x}\t", byte));
+            output.push_str(&format!("inst = {:?}", Instruction::from_byte(byte)));
+        }
         output
     }
 }
