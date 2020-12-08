@@ -32,6 +32,7 @@ pub enum Condition {
 pub enum Instruction {
     NOP,
     JP(Condition),
+    JPHL,
     DI,
     EI,
     LDIMM16(Target),
@@ -53,6 +54,7 @@ pub enum Instruction {
     INC8(Target),
     DEC8(Target),
     ADD(Target),
+    ADDHL(Target),
     ADC(Target),
     SUB(Target),
     SBC(Target),
@@ -89,6 +91,7 @@ impl Instruction {
             0xca => Some(Instruction::JP(Condition::Zero)),
             0xd2 => Some(Instruction::JP(Condition::NotCarry)),
             0xda => Some(Instruction::JP(Condition::Carry)),
+            0xe9 => Some(Instruction::JPHL),
             0xf3 => Some(Instruction::DI),
             0xfb => Some(Instruction::EI),
             0x01 => Some(Instruction::LDIMM16(Target::BC)),
@@ -309,6 +312,10 @@ impl Instruction {
             0xf2 => Some(Instruction::LDAC),
             0x2f => Some(Instruction::CPL),
             0x3f => Some(Instruction::CCF),
+            0x09 => Some(Instruction::ADDHL(Target::BC)),
+            0x19 => Some(Instruction::ADDHL(Target::DE)),
+            0x29 => Some(Instruction::ADDHL(Target::HL)),
+            0x39 => Some(Instruction::ADDHL(Target::SP)),
             _ => None
         }
     }
@@ -317,6 +324,7 @@ impl Instruction {
         match self {
             Instruction::NOP => 1,
             Instruction::JP(_) => 3,
+            Instruction::JPHL => 1,
             Instruction::DI => 1,
             Instruction::EI => 1,
             Instruction::LDIMM16(_) => 3,
@@ -348,6 +356,7 @@ impl Instruction {
             Instruction::RST(_) => 0,
             Instruction::CPL => 1,
             Instruction::CCF => 1,
+            Instruction::ADDHL(_) => 1,
         }
     }
 
@@ -356,6 +365,7 @@ impl Instruction {
         match self {
             Instruction::NOP => 4,
             Instruction::JP(_) => 12,
+            Instruction::JPHL => 4,
             Instruction::DI => 4,
             Instruction::EI => 4,
             Instruction::LDIMM16(_) => 12,
@@ -396,6 +406,7 @@ impl Instruction {
             Instruction::RST(_) => 16,
             Instruction::CPL => 4,
             Instruction::CCF => 4,
+            Instruction::ADDHL(_) => 8,
         }
     }
 }

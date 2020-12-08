@@ -130,6 +130,10 @@ impl Cpu {
                     return Ok((0, 16));
                 }
             },
+            Instruction::JPHL => {
+                self.pc = self.regs.get_hl();
+                return Ok((0, clock));
+            }
             Instruction::DI => {
                 // disable interrupt, since we have no interrupt yet
             }
@@ -453,6 +457,23 @@ impl Cpu {
                 self.regs.f.subtract = false;
                 self.regs.f.half_carry = false;
                 self.regs.f.carry = !self.regs.f.carry;
+            }
+            Instruction::ADDHL(target) => {
+                let value = match &target {
+                    &Target::BC => self.regs.get_bc(),
+                    &Target::DE => self.regs.get_de(),
+                    &Target::HL => self.regs.get_hl(),
+                    &Target::SP => self.sp,
+                    _ => {
+                        info!("Invalid target for instruction {:?}", target);
+                        return Err(());
+                    }
+                };
+                let hl = self.regs.get_hl();
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = ((hl & 0xfff) + (value & 0xfff)) & 0x1000 != 0;
+                self.regs.f.carry = (hl as u32) + (value as u32) > 0xffff;
+                self.regs.set_hl(hl + value);
             }
         }
         Ok((len, clock))
