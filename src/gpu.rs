@@ -1,5 +1,11 @@
 use log::{debug};
 use crate::bus::{Device, VRAM_START, VRAM_END};
+use crate::{WIDTH, HEIGHT};
+
+const BLACK: u32 = 0x00000000u32;
+const DGRAY: u32 = 0x00555555u32;
+const LGRAY: u32 = 0x00AAAAAAu32;
+const WHITE: u32 = 0x00FFFFFFu32;
 
 #[derive(PartialEq)]
 pub enum GpuMode {
@@ -114,7 +120,43 @@ impl Gpu {
         }
     }
 
+    pub fn get_tile_line(&self, tile_idx: usize, line_idx: usize) -> Vec<u32> {
+        assert!(line_idx < 8);
+        let addr = (tile_idx * 8 + line_idx) * 2;
+
+        let byte1 = self.vram[addr];
+        let byte2 = self.vram[addr+1];
+
+        let mut pxs = Vec::with_capacity(8);
+
+        for j in (0..8).rev() {
+            let bit1 = ((byte1 >> j) & 0x1) == 0;
+            let bit2 = ((byte2 >> j) & 0x1) == 0;
+            let color = match (bit1, bit2) {
+                (false, false) => BLACK,
+                (false, true) => DGRAY,
+                (true, false) => LGRAY,
+                (true, true) => WHITE,
+            };
+            pxs.push(color);
+        }
+        pxs
+    }
+
     pub fn build_screen(&self, buffer: &mut Vec<u32>) {
+        // TODO implement (row, col) offset from (scx, scy)
+        for row in 0..HEIGHT {
+            let tile_row = row / 8;
+            let line_idx = row % 8;
+            for col in 0..(WIDTH/8) {
+                let tile_addr = tile_row * 32 + col + (0x9800 - 0x8000);
+                let tile_idx = self.vram[tile_addr] as usize;
+                let pixels = self.get_tile_line(tile_idx, line_idx);
+
+                let pixel_start = row * WIDTH + col * 8;
+                buffer.splice(pixel_start..(pixel_start + 8), pixels.iter().cloned());
+            }
+        }
     }
 
     pub fn update(&mut self, clock: u64) {
