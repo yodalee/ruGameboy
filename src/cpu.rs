@@ -161,6 +161,13 @@ impl Cpu {
                 let addr = self.load(self.pc + 1, DataSize::Word)?;
                 self.regs.a = self.load(addr, DataSize::Byte)? as u8;
             }
+            Instruction::LDA16SP => {
+                let addr = self.load(self.pc + 1, DataSize::Word)?;
+                self.store(addr, DataSize::Word, self.sp)?;
+            }
+            Instruction::LDSPHL => {
+                self.sp = self.regs.get_hl();
+            }
             Instruction::LDIMM8(target) => {
                 let imm = self.load(self.pc + 1, DataSize::Byte)? as u8;
                 self.set_r8(&target, imm)?;
@@ -474,6 +481,42 @@ impl Cpu {
                 self.regs.f.half_carry = ((hl & 0xfff) + (value & 0xfff)) & 0x1000 != 0;
                 self.regs.f.carry = (hl as u32) + (value as u32) > 0xffff;
                 self.regs.set_hl(hl + value);
+            }
+            Instruction::RRA => {
+                let value = self.regs.a;
+                let result = (value >> 1) | ((self.regs.f.carry as u8) << 7);
+                self.regs.f.zero = false;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = (value & 0x01) != 0;
+                self.regs.a = result;
+            }
+            Instruction::DAA => {
+                let mut value = self.regs.a as u16;
+                // Please refer to Z80 manual
+                // subtract
+                if self.regs.f.subtract {
+                    if self.regs.f.half_carry {
+                        value = (value - 0x06) & 0xff;
+                    }
+                    if self.regs.f.carry {
+                        value -= 0x60;
+                    }
+                } else {
+                    if self.regs.f.half_carry || value & 0xf > 0 {
+                        value += 0x06;
+                    }
+                    if self.regs.f.carry || value > 0x9F {
+                        value += 0x60;
+                    }
+                }
+                self.regs.f.zero = value == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                if value & 0x100 != 0 {
+                    self.regs.f.carry = true;
+                }
+                self.regs.a = value as u8;
             }
         }
         Ok((len, clock))

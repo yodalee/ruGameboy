@@ -41,6 +41,8 @@ pub enum Instruction {
     LDA16,
     LD8A,
     LDA8,
+    LDA16SP,
+    LDSPHL,
     LDCA,
     LDAC,
     LDRR(Source, Target),
@@ -65,6 +67,8 @@ pub enum Instruction {
     RST(u16),
     CPL,
     CCF,
+    RRA,
+    DAA,
 }
 
 #[derive(Debug)]
@@ -100,6 +104,8 @@ impl Instruction {
             0x31 => Some(Instruction::LDIMM16(Target::SP)),
             0xea => Some(Instruction::LD16A),
             0xfa => Some(Instruction::LDA16),
+            0x08 => Some(Instruction::LDA16SP),
+            0xf9 => Some(Instruction::LDSPHL),
             0x06 => Some(Instruction::LDIMM8(Target::B)),
             0x16 => Some(Instruction::LDIMM8(Target::D)),
             0x26 => Some(Instruction::LDIMM8(Target::H)),
@@ -316,6 +322,8 @@ impl Instruction {
             0x19 => Some(Instruction::ADDHL(Target::DE)),
             0x29 => Some(Instruction::ADDHL(Target::HL)),
             0x39 => Some(Instruction::ADDHL(Target::SP)),
+            0x1f => Some(Instruction::RRA),
+            0x27 => Some(Instruction::DAA),
             _ => None
         }
     }
@@ -331,6 +339,8 @@ impl Instruction {
             Instruction::LDIMM8(_) => 2,
             Instruction::LD16A => 3,
             Instruction::LDA16 => 3,
+            Instruction::LDA16SP => 3,
+            Instruction::LDSPHL => 1,
             Instruction::LD8A => 2,
             Instruction::LDA8 => 2,
             Instruction::LDCA => 2,
@@ -357,6 +367,8 @@ impl Instruction {
             Instruction::CPL => 1,
             Instruction::CCF => 1,
             Instruction::ADDHL(_) => 1,
+            Instruction::RRA => 1,
+            Instruction::DAA => 1,
         }
     }
 
@@ -372,6 +384,8 @@ impl Instruction {
             Instruction::LDIMM8(t) => if t == &Target::HL { 12 } else { 8 },
             Instruction::LD16A => 16,
             Instruction::LDA16 => 16,
+            Instruction::LDA16SP => 20,
+            Instruction::LDSPHL => 8,
             Instruction::LD8A => 12,
             Instruction::LDA8 => 12,
             Instruction::LDCA => 8,
@@ -407,6 +421,8 @@ impl Instruction {
             Instruction::CPL => 4,
             Instruction::CCF => 4,
             Instruction::ADDHL(_) => 8,
+            Instruction::RRA => 4,
+            Instruction::DAA => 4,
         }
     }
 }
