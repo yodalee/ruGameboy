@@ -13,7 +13,7 @@ pub struct Cpu {
     regs: Register,
     sp: u16,
     pub pc: u16,
-    bus: Bus,
+    pub bus: Bus,
 }
 
 impl Cpu {
