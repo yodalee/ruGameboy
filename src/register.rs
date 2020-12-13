@@ -95,11 +95,11 @@ impl Register {
 impl fmt::Display for Register {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut output = String::new();
-        output = format!("{} af:{:02X}{:02X}", output, self.a, u8::from(&self.f));
-        output = format!("{} bc:{:02X}{:02X}", output, self.b, self.c);
-        output = format!("{} de:{:02X}{:02X}", output, self.d, self.e);
-        output = format!("{} hl:{:02x}{:02X}", output, self.h, self.l);
-        write!(f, "Register {{ {} }}", output)
+        output = format!("{} AF:{:02X}{:02X}", output, self.a, u8::from(&self.f));
+        output = format!("{} BC:{:02X}{:02X}", output, self.b, self.c);
+        output = format!("{} DE:{:02X}{:02X}", output, self.d, self.e);
+        output = format!("{} HL:{:02x}{:02X}", output, self.h, self.l);
+        write!(f, "{}", output)
     }
 }
 

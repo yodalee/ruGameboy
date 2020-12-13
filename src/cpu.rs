@@ -627,17 +627,16 @@ impl Cpu {
 
     pub fn dump(&self) -> String {
         let mut output = String::new();
-        output.push_str(&format!("Register {{ {} }}\n", self.regs));
-        output.push_str(&format!("SP = {:#x}\t", self.sp));
-        output.push_str(&format!("pc = {:#x}\t", self.pc));
+        output.push_str(&format!("\tPC:{:04X} SP:{:04X}\t", self.pc, self.sp));
+        output.push_str(&format!("{}\t", self.regs));
         let byte = self.load(self.pc, DataSize::Byte).unwrap() as u8;
         if byte == 0xcb {
             let byte = self.load(self.pc+1, DataSize::Byte).unwrap() as u8;
-            output.push_str(&format!("byte = {:#x}\t", byte));
-            output.push_str(&format!("inst = {:?}", CBInstruction::from_byte(byte)));
+            output.push_str(&format!("byte:{:02X}\t", byte));
+            output.push_str(&format!("inst:{:?}", CBInstruction::from_byte(byte)));
         } else {
-            output.push_str(&format!("byte = {:#x}\t", byte));
-            output.push_str(&format!("inst = {:?}", Instruction::from_byte(byte)));
+            output.push_str(&format!("byte:{:02X}\t", byte));
+            output.push_str(&format!("inst:{:?}", Instruction::from_byte(byte)));
         }
         output
     }
