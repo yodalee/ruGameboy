@@ -21,13 +21,11 @@ impl Vm {
     pub fn run(&mut self) -> Result<(), ()> {
         // TODO: better way to control this
         while self.cpu.bus.gpu.mode != GpuMode::VBlank {
-            let clock = self.cpu.step()?;
-            self.cpu.bus.gpu.update(clock);
+            self.cpu.step()?;
         }
         self.cpu.bus.gpu.build_screen(&mut self.buffer);
         while self.cpu.bus.gpu.mode == GpuMode::VBlank {
-            let clock = self.cpu.step()?;
-            self.cpu.bus.gpu.update(clock);
+            self.cpu.step()?;
         }
         Ok(())
     }

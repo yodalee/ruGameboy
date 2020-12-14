@@ -26,8 +26,10 @@ impl Cpu {
         }
     }
 
-    pub fn fetch(&self) -> Result<u16, ()> {
-        self.load(self.pc, DataSize::Word)
+    pub fn fetch(&mut self) -> Result<u16, ()> {
+        let byte = self.load(self.pc, DataSize::Word);
+        self.pc += 1;
+        byte
     }
 
     fn load(&self, addr: u16, size: DataSize) -> Result<u16, ()> {
@@ -56,7 +58,7 @@ impl Cpu {
             Target::L  => Ok(self.regs.l),
             Target::HL => Ok(self.load(self.regs.get_hl(), DataSize::Byte)? as u8),
             Target::A  => Ok(self.regs.a),
-            Target::D8 => Ok(self.load(self.pc + 1, DataSize::Byte)? as u8),
+            Target::D8 => Ok(self.load(self.pc, DataSize::Byte)? as u8),
             _ => {
                 info!("Invalid target for instruction {:?}", target);
                 return Err(());
@@ -94,23 +96,23 @@ impl Cpu {
     }
 
     /// run single command in CPU return the clock length
-    pub fn step(&mut self) -> Result<u64, ()> {
+    pub fn step(&mut self) -> Result<(), ()> {
         debug!("{}", self.dump());
+        let clock = self.exec_one_instruction()?;
+        self.bus.gpu.update(clock);
+        Ok(())
+    }
 
+    fn exec_one_instruction(&mut self) -> Result<u64, ()> {
         let byte = self.fetch()? as u8;
         if byte == 0xcb {
-            self.pc += 1;
             let byte = self.fetch()? as u8;
             // CB instruction is full, should not fail
             let inst = CBInstruction::from_byte(byte);
-            let (offset, clock) = self.execute_cb(inst)?;
-            self.pc += offset;
-            Ok(clock)
+            self.execute_cb(inst)
         } else {
             if let Some(inst) = Instruction::from_byte(byte) {
-                let (offset, clock) = self.execute(inst)?;
-                self.pc += offset;
-                Ok(clock)
+                self.execute(inst)
             } else {
                 debug!("Unsupport instruction {:#x}", byte as u8);
                 Err(())
@@ -118,21 +120,22 @@ impl Cpu {
         }
     }
 
-    pub fn execute(&mut self, inst: Instruction) -> Result<(u16, u64), ()> {
+    // execute one non-prefix (0xcb) command, and return the clock passed
+    fn execute(&mut self, inst: Instruction) -> Result<u64, ()> {
         let len = inst.len();
         let clock = inst.clock();
         match inst {
             Instruction::NOP => {},
             Instruction::JP(condition) => {
                 if self.check_condition(&condition) {
-                    let addr = self.load(self.pc + 1, DataSize::Word)?;
+                    let addr = self.load(self.pc, DataSize::Word)?;
                     self.pc = addr;
-                    return Ok((0, 16));
+                    return Ok(16);
                 }
             },
             Instruction::JPHL => {
                 self.pc = self.regs.get_hl();
-                return Ok((0, clock));
+                return Ok(clock);
             }
             Instruction::DI => {
                 // disable interrupt, since we have no interrupt yet
@@ -141,7 +144,7 @@ impl Cpu {
                 // enable interrupt, since we have no interrupt yet
             }
             Instruction::LDIMM16(target) => {
-                let imm = self.load(self.pc + 1, DataSize::Word)?;
+                let imm = self.load(self.pc, DataSize::Word)?;
                 match &target {
                     &Target::BC => self.regs.set_bc(imm),
                     &Target::DE => self.regs.set_de(imm),
@@ -154,30 +157,30 @@ impl Cpu {
                 }
             }
             Instruction::LD16A => {
-                let addr = self.load(self.pc + 1, DataSize::Word)?;
+                let addr = self.load(self.pc, DataSize::Word)?;
                 self.store(addr, DataSize::Byte, self.regs.a as u16)?;
             }
             Instruction::LDA16 => {
-                let addr = self.load(self.pc + 1, DataSize::Word)?;
+                let addr = self.load(self.pc, DataSize::Word)?;
                 self.regs.a = self.load(addr, DataSize::Byte)? as u8;
             }
             Instruction::LDA16SP => {
-                let addr = self.load(self.pc + 1, DataSize::Word)?;
+                let addr = self.load(self.pc, DataSize::Word)?;
                 self.store(addr, DataSize::Word, self.sp)?;
             }
             Instruction::LDSPHL => {
                 self.sp = self.regs.get_hl();
             }
             Instruction::LDIMM8(target) => {
-                let imm = self.load(self.pc + 1, DataSize::Byte)? as u8;
+                let imm = self.load(self.pc, DataSize::Byte)? as u8;
                 self.set_r8(&target, imm)?;
             }
             Instruction::LD8A => {
-                let addr = 0xff00 + (self.load(self.pc + 1, DataSize::Byte)?);
+                let addr = 0xff00 + (self.load(self.pc, DataSize::Byte)?);
                 self.store(addr, DataSize::Byte, self.regs.a as u16)?;
             }
             Instruction::LDA8 => {
-                let addr = 0xff00 + (self.load(self.pc + 1, DataSize::Byte)?);
+                let addr = 0xff00 + (self.load(self.pc, DataSize::Byte)?);
                 self.regs.a = self.load(addr, DataSize::Byte)? as u8;
             }
             Instruction::LDCA => {
@@ -285,11 +288,11 @@ impl Cpu {
             }
             Instruction::CALL(condition) => {
                 if self.check_condition(&condition) {
-                    let addr = self.load(self.pc + 1, DataSize::Word)?;
+                    let addr = self.load(self.pc, DataSize::Word)?;
                     self.store(self.sp-1, DataSize::Word, self.pc + 2)?;
                     self.sp -= 2;
                     self.pc = addr;
-                    return Ok((0, 24));
+                    return Ok(24);
                 }
             }
             Instruction::RET(condition) => {
@@ -297,7 +300,7 @@ impl Cpu {
                     self.pc = self.load(self.sp + 1, DataSize::Word)?;
                     self.sp += 2;
                     let clock = if condition == Condition::Always { 16 } else { 20 };
-                    return Ok((len, clock));
+                    return Ok(clock);
                 }
             }
             Instruction::PUSH(target) => {
@@ -330,9 +333,10 @@ impl Cpu {
             }
             Instruction::JR(condition) => {
                 if self.check_condition(&condition) {
-                    let offset = self.load(self.pc + 1, DataSize::Byte)? as i8;
+                    let offset = self.load(self.pc, DataSize::Byte)? as i8;
                     self.pc = self.pc.wrapping_add(offset as u16);
-                    return Ok((len, 12));
+                    self.pc += len;
+                    return Ok(12);
                 }
             }
             Instruction::INC16(target) => {
@@ -451,7 +455,7 @@ impl Cpu {
             Instruction::RST(addr) => {
                 // note that PC is added in the fetch step
                 // so RST will store PC+1, instead of PC.
-                self.store(self.sp-1, DataSize::Word, self.pc.wrapping_add(1))?;
+                self.store(self.sp-1, DataSize::Word, self.pc)?;
                 self.sp -= 2;
                 self.pc = addr;
             }
@@ -519,11 +523,11 @@ impl Cpu {
                 self.regs.a = value as u8;
             }
         }
-        Ok((len, clock))
+        self.pc += len;
+        Ok(clock)
     }
 
-    pub fn execute_cb(&mut self, inst: CBInstruction) -> Result<(u16, u64), ()> {
-        let len = inst.len();
+    fn execute_cb(&mut self, inst: CBInstruction) -> Result<u64, ()> {
         let clock = inst.clock();
         match inst {
             CBInstruction::RLC(target) => {
@@ -622,7 +626,7 @@ impl Cpu {
                 self.set_r8(&target, value | (1 << offset))?;
             }
         }
-        Ok((len, clock))
+        Ok(clock)
     }
 
     pub fn dump(&self) -> String {

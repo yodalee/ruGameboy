@@ -330,45 +330,27 @@ impl Instruction {
 
     pub fn len(&self) -> u16 {
         match self {
-            Instruction::NOP => 1,
-            Instruction::JP(_) => 3,
-            Instruction::JPHL => 1,
-            Instruction::DI => 1,
-            Instruction::EI => 1,
-            Instruction::LDIMM16(_) => 3,
-            Instruction::LDIMM8(_) => 2,
-            Instruction::LD16A => 3,
-            Instruction::LDA16 => 3,
-            Instruction::LDA16SP => 3,
-            Instruction::LDSPHL => 1,
-            Instruction::LD8A => 2,
-            Instruction::LDA8 => 2,
-            Instruction::LDCA => 2,
-            Instruction::LDAC => 2,
-            Instruction::LDRR(_, _) => 1,
-            Instruction::CALL(_) => 3,
-            Instruction::RET(_) => 1,
-            Instruction::PUSH(_) => 1,
-            Instruction::POP(_)  => 1,
-            Instruction::JR(_) => 2,
-            Instruction::INC16(_) => 1,
-            Instruction::DEC16(_) => 1,
-            Instruction::INC8(_) => 1,
-            Instruction::DEC8(_) => 1,
-            Instruction::ADD(t) => if t == &Target::D8 { 2 } else { 1 },
-            Instruction::ADC(t) => if t == &Target::D8 { 2 } else { 1 },
-            Instruction::SUB(t) => if t == &Target::D8 { 2 } else { 1 },
-            Instruction::SBC(t) => if t == &Target::D8 { 2 } else { 1 },
-            Instruction::AND(t) => if t == &Target::D8 { 2 } else { 1 },
-            Instruction::XOR(t) => if t == &Target::D8 { 2 } else { 1 },
-            Instruction::OR(t) =>  if t == &Target::D8 { 2 } else { 1 },
-            Instruction::CMP(t) => if t == &Target::D8 { 2 } else { 1 },
-            Instruction::RST(_) => 0,
-            Instruction::CPL => 1,
-            Instruction::CCF => 1,
-            Instruction::ADDHL(_) => 1,
-            Instruction::RRA => 1,
-            Instruction::DAA => 1,
+            Instruction::JP(_) => 2,
+            Instruction::LDIMM16(_) => 2,
+            Instruction::LDIMM8(_) => 1,
+            Instruction::LD16A => 2,
+            Instruction::LDA16 => 2,
+            Instruction::LDA16SP => 2,
+            Instruction::LD8A => 1,
+            Instruction::LDA8 => 1,
+            Instruction::LDCA => 1,
+            Instruction::LDAC => 1,
+            Instruction::CALL(_) => 2,
+            Instruction::JR(_) => 1,
+            Instruction::ADD(Target::D8) => 1,
+            Instruction::ADC(Target::D8) => 1,
+            Instruction::SUB(Target::D8) => 1,
+            Instruction::SBC(Target::D8) => 1,
+            Instruction::AND(Target::D8) => 1,
+            Instruction::XOR(Target::D8) => 1,
+            Instruction::OR(Target::D8) =>  1,
+            Instruction::CMP(Target::D8) => 1,
+            _ => 0,
         }
     }
 
@@ -687,10 +669,6 @@ impl CBInstruction {
             0xfe => CBInstruction::SET(Target::HL, 7),
             0xff => CBInstruction::SET(Target::A, 7),
         }
-    }
-
-    pub fn len(&self) -> u16 {
-        1
     }
 
     pub fn clock(&self) -> u64 {
