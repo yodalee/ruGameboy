@@ -15,6 +15,7 @@ mod instruction;
 mod bus;
 mod memory;
 mod vm;
+mod timer;
 
 use vm::{Vm, WIDTH, HEIGHT};
 

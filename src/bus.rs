@@ -1,5 +1,6 @@
 use crate::memory::Memory;
 use crate::gpu::{Gpu, LCDC, VRAM_START, VRAM_END};
+use crate::timer::{Timer, TIMER_START, TIMER_END};
 
 use num_traits::FromPrimitive;
 use num_derive::FromPrimitive;
@@ -23,8 +24,6 @@ enum IO {
     P1      = 0xff00,
     SB      = 0xff01,
     SC      = 0xff02,
-    TMA     = 0xff06,
-    TCA     = 0xff07,
     //TODO move all NR line from 0xff10 to 0xff3f one module
     NR10    = 0xff10,
     NR11    = 0xff11,
@@ -87,6 +86,7 @@ pub trait Device {
 pub struct Bus {
     catridge: Memory,
     pub gpu: Gpu,
+    pub timer: Timer,
     ram: Memory,
     oam: Memory,
     hram: Memory,
@@ -100,6 +100,7 @@ impl Bus {
         Self {
             catridge: catridge,
             gpu: Gpu::new(),
+            timer: Timer::new(),
             ram: Memory::new_empty(RAM_START as usize, (RAM_END - RAM_START + 1) as usize),
             oam: Memory::new_empty(OAM_START as usize, (OAM_END - OAM_START + 1) as usize),
             hram: Memory::new_empty(HRAM_START as usize, (HRAM_END - HRAM_START + 1) as usize),
@@ -119,6 +120,7 @@ impl Bus {
                 Ok(0)
             }
             HRAM_START ..= HRAM_END => self.hram.load(addr),
+            TIMER_START ..= TIMER_END => self.timer.load(addr),
             _ => {
                 // match IO line
                 match FromPrimitive::from_u16(addr) {
@@ -153,6 +155,7 @@ impl Bus {
                 Ok(())
             }
             HRAM_START ..= HRAM_END => self.hram.store(addr, value),
+            TIMER_START ..= TIMER_END => self.timer.store(addr, value),
             _ => {
                 // match IO line
                 match FromPrimitive::from_u16(addr) {
