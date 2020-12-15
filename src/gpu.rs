@@ -1,11 +1,13 @@
-use log::{debug};
-use crate::bus::{Device, VRAM_START, VRAM_END};
+use crate::bus::{Device};
 use crate::{WIDTH, HEIGHT};
 
 const BLACK: u32 = 0x00000000u32;
 const DGRAY: u32 = 0x00555555u32;
 const LGRAY: u32 = 0x00AAAAAAu32;
 const WHITE: u32 = 0x00FFFFFFu32;
+
+pub const VRAM_START:     u16 = 0x8000;
+pub const VRAM_END:       u16 = 0x9fff;
 
 #[derive(PartialEq)]
 pub enum GpuMode {
@@ -195,13 +197,15 @@ impl Gpu {
 
 impl Device for Gpu {
     fn load(&self, addr: u16) -> Result<u8, ()> {
-        match self.vram.get(addr as usize) {
+        let addr = (addr - VRAM_START) as usize;
+        match self.vram.get(addr) {
             Some(elem) => Ok(*elem),
             None => Err(()),
         }
     }
 
     fn store(&mut self, addr: u16, value: u8) -> Result<(), ()> {
+        let addr = (addr - VRAM_START) as usize;
         match self.vram.get_mut(addr as usize) {
             Some(elem) => {
                 *elem = value;
