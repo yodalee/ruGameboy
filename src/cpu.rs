@@ -9,11 +9,24 @@ enum DataSize {
     Word,
 }
 
+#[derive(Eq,PartialEq,Clone,Copy)]
+pub enum InterruptState {
+    IDisable,
+    IEnable,
+    IDisableNext,
+    IEnableNext,
+}
+
+impl Default for InterruptState {
+    fn default() -> Self { InterruptState::IDisable }
+}
+
 pub struct Cpu {
     regs: Register,
     sp: u16,
     pub pc: u16,
     pub bus: Bus,
+    interrupt_state: InterruptState,
 }
 
 impl Cpu {
@@ -23,6 +36,7 @@ impl Cpu {
             sp: 0,
             pc: 0x0100, // Starting point of execution
             bus: Bus::new(binary),
+            interrupt_state: InterruptState::default(),
         }
     }
 
@@ -100,7 +114,29 @@ impl Cpu {
         debug!("{}", self.dump());
         let clock = self.exec_one_instruction()?;
         self.bus.gpu.update(clock);
+        self.bus.timer.update(clock);
+
+        // handle interrupt
+        if self.interrupt_state == InterruptState::IEnable ||
+           self.interrupt_state == InterruptState::IDisableNext {
+            let clock = self.handle_interrupt();
+
+            self.bus.gpu.update(clock);
+            self.bus.timer.update(clock);
+        }
+
+        // update interrupt state
+        self.interrupt_state = match self.interrupt_state {
+            InterruptState::IDisableNext => InterruptState::IDisable,
+            InterruptState::IEnableNext => InterruptState::IEnable,
+            _ => self.interrupt_state,
+        };
+
         Ok(())
+    }
+
+    fn handle_interrupt(&self) -> u64 {
+        0
     }
 
     fn exec_one_instruction(&mut self) -> Result<u64, ()> {
@@ -138,10 +174,10 @@ impl Cpu {
                 return Ok(clock);
             }
             Instruction::DI => {
-                // disable interrupt, since we have no interrupt yet
+                self.interrupt_state = InterruptState::IDisable;
             }
             Instruction::EI => {
-                // enable interrupt, since we have no interrupt yet
+                self.interrupt_state = InterruptState::IEnable;
             }
             Instruction::LDIMM16(target) => {
                 let imm = self.load(self.pc, DataSize::Word)?;
@@ -304,6 +340,7 @@ impl Cpu {
                 }
             }
             Instruction::RETI => {
+                self.interrupt_state = InterruptState::IEnable;
                 self.pc = self.load(self.sp + 1, DataSize::Word)?;
                 self.sp += 2;
                 return Ok(clock);
