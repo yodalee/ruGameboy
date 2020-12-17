@@ -7,16 +7,61 @@ use num_derive::FromPrimitive;
 use log::{error, info};
 
 /// memory map of LR35902, xxx_START to xxx_END inclusive
-pub const CATRIDGE_START: u16 = 0x0000;
-pub const CATRIDGE_END:   u16 = 0x7fff;
-pub const RAM_START:      u16 = 0xc000;
-pub const RAM_END:        u16 = 0xdfff;
-pub const OAM_START:      u16 = 0xfe00;
-pub const OAM_END:        u16 = 0xfe9f;
-pub const UNUSABLE_START: u16 = 0xfea0;
-pub const UNUSABLE_END:   u16 = 0xfeff;
-pub const HRAM_START:     u16 = 0xff80;
-pub const HRAM_END:       u16 = 0xfffe;
+const CATRIDGE_START: u16 = 0x0000;
+const CATRIDGE_END:   u16 = 0x7fff;
+const RAM_START:      u16 = 0xc000;
+const RAM_END:        u16 = 0xdfff;
+const OAM_START:      u16 = 0xfe00;
+const OAM_END:        u16 = 0xfe9f;
+const UNUSABLE_START: u16 = 0xfea0;
+const UNUSABLE_END:   u16 = 0xfeff;
+const HRAM_START:     u16 = 0xff80;
+const HRAM_END:       u16 = 0xfffe;
+const INT:            u16 = 0xff0f;
+const INTENB:         u16 = 0xffff;
+
+/// Bit offset of interrupt register
+const VBLANK_SHIFT: u8 = 0;
+const LCDC_SHIFT: u8 = 1;
+const TIMER_SHIFT: u8 = 2;
+const SERIAL_SHIFT: u8 = 3;
+const JOYPAD_SHIFT: u8 = 4;
+
+#[derive(Debug,Default)]
+pub struct InterruptFlag {
+    // vblank on/off
+    pub vblank: bool,
+    // LCDC on/off
+    pub lcdc: bool,
+    // timer on/off
+    pub timer: bool,
+    // serial on/off
+    pub serial: bool,
+    // serial on/off
+    pub joypad: bool,
+}
+
+impl std::convert::From<&InterruptFlag> for u8 {
+    fn from(flag: &InterruptFlag) -> Self {
+        ( if flag.vblank { 1 << VBLANK_SHIFT } else { 0 } ) |
+        ( if flag.lcdc   { 1 << LCDC_SHIFT   } else { 0 } ) |
+        ( if flag.timer  { 1 << TIMER_SHIFT  } else { 0 } ) |
+        ( if flag.serial { 1 << SERIAL_SHIFT } else { 0 } ) |
+        ( if flag.joypad { 1 << JOYPAD_SHIFT } else { 0 } )
+    }
+}
+
+impl std::convert::From<u8> for InterruptFlag {
+    fn from(byte: u8) -> Self {
+        InterruptFlag {
+            vblank: ((byte >> VBLANK_SHIFT) & 0b1) != 0,
+            lcdc:   ((byte >> LCDC_SHIFT  ) & 0b1) != 0,
+            timer:  ((byte >> TIMER_SHIFT ) & 0b1) != 0,
+            serial: ((byte >> SERIAL_SHIFT) & 0b1) != 0,
+            joypad: ((byte >> JOYPAD_SHIFT) & 0b1) != 0,
+        }
+    }
+}
 
 /// IO line, 0xff00 - 0xff7f
 #[derive(FromPrimitive)]
@@ -74,8 +119,6 @@ enum IO {
     WINY    = 0xff4a,
     WINX    = 0xff4b,
     Dummy7f = 0xff7f,
-    Int     = 0xff0f,
-    IntEnb  = 0xffff,
 }
 
 pub trait Device {
@@ -90,8 +133,7 @@ pub struct Bus {
     ram: Memory,
     oam: Memory,
     hram: Memory,
-    interruptflag: u8,
-    interruptenb: u8,
+    pub interruptenb: InterruptFlag,
 }
 
 impl Bus {
@@ -104,9 +146,18 @@ impl Bus {
             ram: Memory::new_empty(RAM_START as usize, (RAM_END - RAM_START + 1) as usize),
             oam: Memory::new_empty(OAM_START as usize, (OAM_END - OAM_START + 1) as usize),
             hram: Memory::new_empty(HRAM_START as usize, (HRAM_END - HRAM_START + 1) as usize),
-            interruptflag: 0,
-            interruptenb: 0,
+            interruptenb: Default::default(),
         }
+    }
+
+    fn load_interrupt(&self) -> u8 {
+       ( if self.gpu.is_interrupt   { 1 << VBLANK_SHIFT } else { 0 } ) |
+       ( if self.timer.is_interrupt { 1 << TIMER_SHIFT  } else { 0 } )
+    }
+
+    fn store_interrupt(&mut self, value: u8) {
+        self.gpu.is_interrupt   = (value >> VBLANK_SHIFT) & 0x1 != 0;
+        self.timer.is_interrupt = (value >> TIMER_SHIFT)  & 0x4 != 0;
     }
 
     fn load(&self, addr: u16) -> Result<u8, ()> {
@@ -121,6 +172,8 @@ impl Bus {
             }
             HRAM_START ..= HRAM_END => self.hram.load(addr),
             TIMER_START ..= TIMER_END => self.timer.load(addr),
+            INT => Ok(self.load_interrupt()),
+            INTENB => Ok(u8::from(&self.interruptenb)),
             _ => {
                 // match IO line
                 match FromPrimitive::from_u16(addr) {
@@ -132,8 +185,6 @@ impl Bus {
                     Some(IO::BGP) => Ok(self.gpu.bg_palette),
                     Some(IO::OBP0) => Ok(self.gpu.ob0_palette),
                     Some(IO::OBP1) => Ok(self.gpu.ob1_palette),
-                    Some(IO::Int) => Ok(self.interruptflag),
-                    Some(IO::IntEnb) => Ok(self.interruptenb),
                     Some(_) => Ok(0),
                     None => {
                         error!("Invalid load to address {:#x}", addr);
@@ -156,6 +207,8 @@ impl Bus {
             }
             HRAM_START ..= HRAM_END => self.hram.store(addr, value),
             TIMER_START ..= TIMER_END => self.timer.store(addr, value),
+            INT => Ok(self.store_interrupt(value)),
+            INTENB => Ok(self.interruptenb = InterruptFlag::from(value)),
             _ => {
                 // match IO line
                 match FromPrimitive::from_u16(addr) {
@@ -167,8 +220,6 @@ impl Bus {
                     Some(IO::BGP) => self.gpu.bg_palette = value,
                     Some(IO::OBP0) => self.gpu.ob0_palette = value,
                     Some(IO::OBP1) => self.gpu.ob1_palette = value,
-                    Some(IO::Int) => self.interruptflag = value,
-                    Some(IO::IntEnb) => self.interruptenb = value,
                     Some(_) => {},
                     None => {
                         error!("Invalid store to address {:#x}", addr);

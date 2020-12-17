@@ -44,11 +44,16 @@ pub struct Timer {
     div_counter: u64,
     timer_counter: u64,
     roundvalue: u64,
+    pub is_interrupt: bool,
 }
 
 impl Timer {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub fn is_interrupt(&self) -> bool{
+        self.is_interrupt
     }
 
     pub fn update(&mut self, clock: u64) {

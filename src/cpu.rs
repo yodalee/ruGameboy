@@ -119,7 +119,7 @@ impl Cpu {
         // handle interrupt
         if self.interrupt_state == InterruptState::IEnable ||
            self.interrupt_state == InterruptState::IDisableNext {
-            let clock = self.handle_interrupt();
+            let clock = self.handle_interrupt()?;
 
             self.bus.gpu.update(clock);
             self.bus.timer.update(clock);
@@ -135,8 +135,15 @@ impl Cpu {
         Ok(())
     }
 
-    fn handle_interrupt(&self) -> u64 {
-        0
+    fn handle_interrupt(&mut self) -> Result<u64, ()> {
+        // Vblank, priority 1, highest
+        if self.bus.interruptenb.vblank && self.bus.gpu.is_interrupt {
+            debug!("VBlank Interrupt");
+            self.bus.gpu.is_interrupt = false;
+            self.interrupt_state = InterruptState::IDisable;
+            return self.execute(Instruction::RST(0x40))
+        }
+        Ok(0)
     }
 
     fn exec_one_instruction(&mut self) -> Result<u64, ()> {
@@ -174,10 +181,10 @@ impl Cpu {
                 return Ok(clock);
             }
             Instruction::DI => {
-                self.interrupt_state = InterruptState::IDisable;
+                self.interrupt_state = InterruptState::IDisableNext;
             }
             Instruction::EI => {
-                self.interrupt_state = InterruptState::IEnable;
+                self.interrupt_state = InterruptState::IEnableNext;
             }
             Instruction::LDIMM16(target) => {
                 let imm = self.load(self.pc, DataSize::Word)?;
