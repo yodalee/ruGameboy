@@ -303,6 +303,11 @@ impl Cpu {
                     return Ok(clock);
                 }
             }
+            Instruction::RETI => {
+                self.pc = self.load(self.sp + 1, DataSize::Word)?;
+                self.sp += 2;
+                return Ok(clock);
+            }
             Instruction::PUSH(target) => {
                 let value = match target {
                     Target::BC => self.regs.get_bc(),
