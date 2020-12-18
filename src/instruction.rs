@@ -338,8 +338,6 @@ impl Instruction {
             Instruction::LDA16SP => 2,
             Instruction::LD8A => 1,
             Instruction::LDA8 => 1,
-            Instruction::LDCA => 1,
-            Instruction::LDAC => 1,
             Instruction::CALL(_) => 2,
             Instruction::JR(_) => 1,
             Instruction::ADD(Target::D8) => 1,
