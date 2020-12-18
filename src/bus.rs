@@ -42,6 +42,7 @@ enum IO {
     SCY     = 0xff42,
     SCX     = 0xff43,
     LY      = 0xff44,
+    DMA     = 0xff46,
     BGP     = 0xff47,
     OBP0    = 0xff48,
     OBP1    = 0xff49,
@@ -95,6 +96,7 @@ impl Bus {
             _ => {
                 // match IO line
                 match FromPrimitive::from_u16(addr) {
+                    Some(IO::P1) => Ok(0x0f),
                     Some(IO::LCDC) => Ok(self.gpu.lcdc.to_u8()),
                     Some(IO::SCY) => Ok(self.gpu.scy),
                     Some(IO::SCX) => Ok(self.gpu.scx),
@@ -128,6 +130,7 @@ impl Bus {
             _ => {
                 // match IO line
                 match FromPrimitive::from_u16(addr) {
+                    Some(IO::P1) => {},
                     Some(IO::LCDC) => self.gpu.lcdc = LCDC::from_u8(value),
                     Some(IO::SCY) => self.gpu.scy = value,
                     Some(IO::SCX) => self.gpu.scx = value,
