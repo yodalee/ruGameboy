@@ -103,6 +103,9 @@ pub struct Gpu {
     pub scx: u8,
     /// vram: 0x8000-0x9BFF 6144 bytes
     vram: Vec<u8>,
+
+    // whether vblank interrupt is occured
+    pub is_interrupt: bool
 }
 
 impl Gpu {
@@ -119,6 +122,7 @@ impl Gpu {
             scy: 0,
             scx: 0,
             vram: ram,
+            is_interrupt: false
         }
     }
 
@@ -177,6 +181,8 @@ impl Gpu {
                 self.clock -= 204;
                 if self.line >= 143 {
                     self.mode = GpuMode::VBlank;
+                    // enable vblank interrupt
+                    self.is_interrupt = true;
                 } else {
                     self.mode = GpuMode::ScanlineOAM;
                 }
