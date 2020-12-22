@@ -1,5 +1,5 @@
 use crate::memory::Memory;
-use crate::gpu::{Gpu, LCDC, VRAM_START, VRAM_END};
+use crate::gpu::{Gpu, LCDC, VRAM_START, VRAM_END, OAM_START, OAM_END};
 use crate::timer::{Timer, TIMER_START, TIMER_END};
 
 use num_traits::FromPrimitive;
@@ -11,8 +11,6 @@ const CATRIDGE_START: u16 = 0x0000;
 const CATRIDGE_END:   u16 = 0x7fff;
 const RAM_START:      u16 = 0xc000;
 const RAM_END:        u16 = 0xdfff;
-const OAM_START:      u16 = 0xfe00;
-const OAM_END:        u16 = 0xfe9f;
 const UNUSABLE_START: u16 = 0xfea0;
 const UNUSABLE_END:   u16 = 0xfeff;
 const HRAM_START:     u16 = 0xff80;
@@ -131,7 +129,6 @@ pub struct Bus {
     pub gpu: Gpu,
     pub timer: Timer,
     ram: Memory,
-    oam: Memory,
     hram: Memory,
     pub interruptenb: InterruptFlag,
 }
@@ -144,7 +141,6 @@ impl Bus {
             gpu: Gpu::new(),
             timer: Timer::new(),
             ram: Memory::new_empty(RAM_START as usize, (RAM_END - RAM_START + 1) as usize),
-            oam: Memory::new_empty(OAM_START as usize, (OAM_END - OAM_START + 1) as usize),
             hram: Memory::new_empty(HRAM_START as usize, (HRAM_END - HRAM_START + 1) as usize),
             interruptenb: Default::default(),
         }
@@ -165,7 +161,7 @@ impl Bus {
             CATRIDGE_START ..= CATRIDGE_END => self.catridge.load(addr),
             VRAM_START ..= VRAM_END => self.gpu.load(addr),
             RAM_START ..= RAM_END => self.ram.load(addr),
-            OAM_START ..= OAM_END => self.oam.load(addr),
+            OAM_START ..= OAM_END => self.gpu.load(addr),
             UNUSABLE_START ..= UNUSABLE_END => {
                 info!("Load at unusable address {:#x}", addr);
                 Ok(0)
@@ -200,7 +196,7 @@ impl Bus {
             CATRIDGE_START ..= CATRIDGE_END => self.catridge.store(addr, value),
             VRAM_START ..= VRAM_END => self.gpu.store(addr, value),
             RAM_START ..= RAM_END => self.ram.store(addr, value),
-            OAM_START ..= OAM_END => self.oam.store(addr, value),
+            OAM_START ..= OAM_END => self.gpu.store(addr, value),
             UNUSABLE_START ..= UNUSABLE_END => {
                 info!("Write at unusable address {:#x}", addr);
                 Ok(())

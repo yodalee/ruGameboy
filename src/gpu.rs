@@ -8,6 +8,8 @@ const WHITE: u32 = 0x00FFFFFFu32;
 
 pub const VRAM_START:     u16 = 0x8000;
 pub const VRAM_END:       u16 = 0x9fff;
+pub const OAM_START:      u16 = 0xfe00;
+pub const OAM_END:        u16 = 0xfe9f;
 
 #[derive(PartialEq)]
 pub enum GpuMode {
@@ -21,6 +23,7 @@ pub enum GpuMode {
     VBlank,
 }
 
+#[derive(Debug,Clone,Copy)]
 pub struct LCDC {
     /// LCD control operation
     /// false: stop
@@ -103,6 +106,8 @@ pub struct Gpu {
     pub scx: u8,
     /// vram: 0x8000-0x9BFF 6144 bytes
     vram: Vec<u8>,
+    /// oam: 0xFE00-0xFE9F 160 bytes
+    oam: Vec<u8>,
 
     // whether vblank interrupt is occured
     pub is_interrupt: bool
@@ -111,6 +116,7 @@ pub struct Gpu {
 impl Gpu {
     pub fn new() -> Self {
         let ram = vec![0; (VRAM_END - VRAM_START + 1) as usize];
+        let oam = vec![0; (OAM_END - OAM_START + 1) as usize];
         Self {
             clock: 0,
             line: 0,
@@ -122,6 +128,7 @@ impl Gpu {
             scy: 0,
             scx: 0,
             vram: ram,
+            oam: oam,
             is_interrupt: false
         }
     }
@@ -203,21 +210,48 @@ impl Gpu {
 
 impl Device for Gpu {
     fn load(&self, addr: u16) -> Result<u8, ()> {
-        let addr = (addr - VRAM_START) as usize;
-        match self.vram.get(addr) {
-            Some(elem) => Ok(*elem),
-            None => Err(()),
+        match addr {
+            VRAM_START ..= VRAM_END => {
+                let addr = (addr - VRAM_START) as usize;
+                match self.vram.get(addr) {
+                    Some(elem) => Ok(*elem),
+                    None => Err(()),
+                }
+            }
+            OAM_START ..= OAM_END => {
+                let addr = (addr - OAM_START) as usize;
+                match self.oam.get(addr) {
+                    Some(elem) => Ok(*elem),
+                    None => Err(()),
+                }
+            }
+            _ => Err(()),
         }
     }
 
     fn store(&mut self, addr: u16, value: u8) -> Result<(), ()> {
-        let addr = (addr - VRAM_START) as usize;
-        match self.vram.get_mut(addr as usize) {
-            Some(elem) => {
-                *elem = value;
-                Ok(())
-            },
-            None => Err(()),
+        match addr {
+            VRAM_START ..= VRAM_END => {
+                let addr = (addr - VRAM_START) as usize;
+                match self.vram.get_mut(addr as usize) {
+                    Some(elem) => {
+                        *elem = value;
+                        Ok(())
+                    },
+                    None => Err(()),
+                }
+            }
+            OAM_START ..= OAM_END => {
+                let addr = (addr - OAM_START) as usize;
+                match self.oam.get_mut(addr as usize) {
+                    Some(elem) => {
+                        *elem = value;
+                        Ok(())
+                    },
+                    None => Err(()),
+                }
+            }
+            _ => Err(()),
         }
     }
 }
