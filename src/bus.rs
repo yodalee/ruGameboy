@@ -1,6 +1,7 @@
 use crate::memory::Memory;
 use crate::gpu::{Gpu, LCDC, VRAM_START, VRAM_END, OAM_START, OAM_END};
 use crate::timer::{Timer, TIMER_START, TIMER_END};
+use crate::joypad::{Joypad, JOYPAD_ADDR};
 
 use num_traits::FromPrimitive;
 use num_derive::FromPrimitive;
@@ -64,7 +65,6 @@ impl std::convert::From<u8> for InterruptFlag {
 /// IO line, 0xff00 - 0xff7f
 #[derive(FromPrimitive)]
 enum IO {
-    P1      = 0xff00,
     SB      = 0xff01,
     SC      = 0xff02,
     //TODO move all NR line from 0xff10 to 0xff3f one module
@@ -131,6 +131,7 @@ pub struct Bus {
     ram: Memory,
     hram: Memory,
     pub interruptenb: InterruptFlag,
+    pub joypad: Joypad,
 }
 
 impl Bus {
@@ -142,6 +143,7 @@ impl Bus {
             timer: Timer::new(),
             ram: Memory::new_empty(RAM_START as usize, (RAM_END - RAM_START + 1) as usize),
             hram: Memory::new_empty(HRAM_START as usize, (HRAM_END - HRAM_START + 1) as usize),
+            joypad: Joypad::new(),
             interruptenb: Default::default(),
         }
     }
@@ -168,12 +170,12 @@ impl Bus {
             }
             HRAM_START ..= HRAM_END => self.hram.load(addr),
             TIMER_START ..= TIMER_END => self.timer.load(addr),
+            JOYPAD_ADDR => self.joypad.load(addr),
             INT => Ok(self.load_interrupt()),
             INTENB => Ok(u8::from(&self.interruptenb)),
             _ => {
                 // match IO line
                 match FromPrimitive::from_u16(addr) {
-                    Some(IO::P1) => Ok(0x0f),
                     Some(IO::LCDC) => Ok(self.gpu.lcdc.to_u8()),
                     Some(IO::SCY) => Ok(self.gpu.scy),
                     Some(IO::SCX) => Ok(self.gpu.scx),
@@ -206,12 +208,12 @@ impl Bus {
             }
             HRAM_START ..= HRAM_END => self.hram.store(addr, value),
             TIMER_START ..= TIMER_END => self.timer.store(addr, value),
+            JOYPAD_ADDR => self.joypad.store(addr, value),
             INT => Ok(self.store_interrupt(value)),
             INTENB => Ok(self.interruptenb = InterruptFlag::from(value)),
             _ => {
                 // match IO line
                 match FromPrimitive::from_u16(addr) {
-                    Some(IO::P1) => {},
                     Some(IO::LCDC) => self.gpu.lcdc = LCDC::from_u8(value),
                     Some(IO::SCY) => self.gpu.scy = value,
                     Some(IO::SCX) => self.gpu.scx = value,

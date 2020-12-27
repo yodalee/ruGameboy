@@ -6,7 +6,7 @@ pub const WIDTH: usize = 160;
 pub const HEIGHT: usize = 144;
 
 pub struct Vm {
-    cpu: Cpu,
+    pub cpu: Cpu,
     pub buffer: Vec<u32>,
 }
 

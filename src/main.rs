@@ -19,6 +19,7 @@ mod timer;
 mod joypad;
 
 use vm::{Vm, WIDTH, HEIGHT};
+use joypad::{JoypadKey};
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -49,14 +50,14 @@ fn main() -> io::Result<()> {
         window.get_keys_pressed(KeyRepeat::No).map(|keys| {
             for key in keys {
                 match key {
-                    Key::Up    => println!("pressed up"),
-                    Key::Down  => println!("pressed down"),
-                    Key::Left  => println!("pressed left"),
-                    Key::Right => println!("pressed right"),
-                    Key::A     => println!("pressed Start"),
-                    Key::S     => println!("pressed Select"),
-                    Key::Z     => println!("pressed A"),
-                    Key::X     => println!("pressed B"),
+                    Key::Up    => vm.cpu.bus.joypad.presskey(JoypadKey::UP),
+                    Key::Down  => vm.cpu.bus.joypad.presskey(JoypadKey::DOWN),
+                    Key::Left  => vm.cpu.bus.joypad.presskey(JoypadKey::LEFT),
+                    Key::Right => vm.cpu.bus.joypad.presskey(JoypadKey::RIGHT),
+                    Key::A     => vm.cpu.bus.joypad.presskey(JoypadKey::START),
+                    Key::S     => vm.cpu.bus.joypad.presskey(JoypadKey::SELECT),
+                    Key::Z     => vm.cpu.bus.joypad.presskey(JoypadKey::A),
+                    Key::X     => vm.cpu.bus.joypad.presskey(JoypadKey::B),
                     _ => (),
                 }
             }
@@ -66,14 +67,14 @@ fn main() -> io::Result<()> {
         window.get_keys_released().map(|keys| {
             for key in keys {
                 match key {
-                    Key::Up    => println!("released up"),
-                    Key::Down  => println!("released down"),
-                    Key::Left  => println!("released left"),
-                    Key::Right => println!("released right"),
-                    Key::A     => println!("released Start"),
-                    Key::S     => println!("released Select"),
-                    Key::Z     => println!("released A"),
-                    Key::X     => println!("released B"),
+                    Key::Up    => vm.cpu.bus.joypad.releasekey(JoypadKey::UP),
+                    Key::Down  => vm.cpu.bus.joypad.releasekey(JoypadKey::DOWN),
+                    Key::Left  => vm.cpu.bus.joypad.releasekey(JoypadKey::LEFT),
+                    Key::Right => vm.cpu.bus.joypad.releasekey(JoypadKey::RIGHT),
+                    Key::A     => vm.cpu.bus.joypad.releasekey(JoypadKey::START),
+                    Key::S     => vm.cpu.bus.joypad.releasekey(JoypadKey::SELECT),
+                    Key::Z     => vm.cpu.bus.joypad.releasekey(JoypadKey::A),
+                    Key::X     => vm.cpu.bus.joypad.releasekey(JoypadKey::B),
                     _ => (),
                 }
             }

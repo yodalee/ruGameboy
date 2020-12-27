@@ -27,6 +27,32 @@ impl Joypad {
             mask: 0x30,
         }
     }
+
+    pub fn presskey(&mut self, key: JoypadKey) {
+        match key {
+            JoypadKey::RIGHT  => self.p14 &= !0x01,
+            JoypadKey::LEFT   => self.p14 &= !0x02,
+            JoypadKey::UP     => self.p14 &= !0x04,
+            JoypadKey::DOWN   => self.p14 &= !0x08,
+            JoypadKey::A      => self.p15 &= !0x01,
+            JoypadKey::B      => self.p15 &= !0x02,
+            JoypadKey::SELECT => self.p15 &= !0x04,
+            JoypadKey::START  => self.p15 &= !0x08,
+        }
+    }
+
+    pub fn releasekey(&mut self, key: JoypadKey) {
+        match key {
+            JoypadKey::RIGHT  => self.p14 |= 0x01,
+            JoypadKey::LEFT   => self.p14 |= 0x02,
+            JoypadKey::UP     => self.p14 |= 0x04,
+            JoypadKey::DOWN   => self.p14 |= 0x08,
+            JoypadKey::A      => self.p15 |= 0x01,
+            JoypadKey::B      => self.p15 |= 0x02,
+            JoypadKey::SELECT => self.p15 |= 0x04,
+            JoypadKey::START  => self.p15 |= 0x08,
+        }
+    }
 }
 
 impl Device for Joypad {
