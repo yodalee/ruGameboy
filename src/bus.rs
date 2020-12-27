@@ -163,7 +163,7 @@ impl Bus {
             RAM_START ..= RAM_END => self.ram.load(addr),
             OAM_START ..= OAM_END => self.gpu.load(addr),
             UNUSABLE_START ..= UNUSABLE_END => {
-                info!("Load at unusable address {:#x}", addr);
+                info!("Load at unusable address {:#X}", addr);
                 Ok(0)
             }
             HRAM_START ..= HRAM_END => self.hram.load(addr),
@@ -181,9 +181,12 @@ impl Bus {
                     Some(IO::BGP) => Ok(self.gpu.bg_palette),
                     Some(IO::OBP0) => Ok(self.gpu.ob0_palette),
                     Some(IO::OBP1) => Ok(self.gpu.ob1_palette),
-                    Some(_) => Ok(0),
+                    Some(_) => {
+                        info!("Unimplemented load on address {:#X}", addr);
+                        Ok(0)
+                    },
                     None => {
-                        error!("Invalid load to address {:#x}", addr);
+                        error!("Invalid load on address {:#X}", addr);
                         Err(())
                     }
                 }
@@ -198,7 +201,7 @@ impl Bus {
             RAM_START ..= RAM_END => self.ram.store(addr, value),
             OAM_START ..= OAM_END => self.gpu.store(addr, value),
             UNUSABLE_START ..= UNUSABLE_END => {
-                info!("Write at unusable address {:#x}", addr);
+                info!("Write at unusable address {:#X}", addr);
                 Ok(())
             }
             HRAM_START ..= HRAM_END => self.hram.store(addr, value),
@@ -213,17 +216,35 @@ impl Bus {
                     Some(IO::SCY) => self.gpu.scy = value,
                     Some(IO::SCX) => self.gpu.scx = value,
                     Some(IO::LY) => self.gpu.line = 0,
+                    Some(IO::DMA) => self.dma(value),
                     Some(IO::BGP) => self.gpu.bg_palette = value,
                     Some(IO::OBP0) => self.gpu.ob0_palette = value,
                     Some(IO::OBP1) => self.gpu.ob1_palette = value,
                     Some(_) => {},
                     None => {
-                        error!("Invalid store to address {:#x}", addr);
+                        error!("Invalid store to address {:#X}", addr);
                         return Err(())
                     }
                 }
                 Ok(())
             }
+        }
+    }
+
+    fn dma(&mut self, value: u8) {
+        /* dma copy 40 * 28 bits data to OAM zone 0xFE00-0xFE9F
+         * each sprite takes 28 bits space (note that 4 bits are not used in each sprite)
+         * the source address can be designated every 0x100 from 0x0000 to 0xF100.
+         * Depend on the value stored to dma IO line:
+         * 0x00 -> 0x0000
+         * 0x01 -> 0x0100
+         * ...
+         */
+        let addr = (value as u16) << 8;
+        // copy memory to OAM
+        for i in 0..(40 * 4) {
+            let byte = self.load(addr + i).unwrap();
+            self.store(OAM_START + i, byte).unwrap();
         }
     }
 
