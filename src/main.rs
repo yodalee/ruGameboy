@@ -6,7 +6,7 @@ use log::{error, debug};
 
 #[macro_use]
 extern crate num_derive;
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Window, WindowOptions, KeyRepeat};
 
 mod cpu;
 mod gpu;
@@ -16,8 +16,10 @@ mod bus;
 mod memory;
 mod vm;
 mod timer;
+mod joypad;
 
 use vm::{Vm, WIDTH, HEIGHT};
+use joypad::{JoypadKey};
 
 fn main() -> io::Result<()> {
     env_logger::init();
@@ -43,6 +45,41 @@ fn main() -> io::Result<()> {
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
+
+        // check key press
+        window.get_keys_pressed(KeyRepeat::No).map(|keys| {
+            for key in keys {
+                match key {
+                    Key::Up    => vm.cpu.bus.joypad.presskey(JoypadKey::UP),
+                    Key::Down  => vm.cpu.bus.joypad.presskey(JoypadKey::DOWN),
+                    Key::Left  => vm.cpu.bus.joypad.presskey(JoypadKey::LEFT),
+                    Key::Right => vm.cpu.bus.joypad.presskey(JoypadKey::RIGHT),
+                    Key::A     => vm.cpu.bus.joypad.presskey(JoypadKey::START),
+                    Key::S     => vm.cpu.bus.joypad.presskey(JoypadKey::SELECT),
+                    Key::Z     => vm.cpu.bus.joypad.presskey(JoypadKey::A),
+                    Key::X     => vm.cpu.bus.joypad.presskey(JoypadKey::B),
+                    _ => (),
+                }
+            }
+        });
+
+        // check key release
+        window.get_keys_released().map(|keys| {
+            for key in keys {
+                match key {
+                    Key::Up    => vm.cpu.bus.joypad.releasekey(JoypadKey::UP),
+                    Key::Down  => vm.cpu.bus.joypad.releasekey(JoypadKey::DOWN),
+                    Key::Left  => vm.cpu.bus.joypad.releasekey(JoypadKey::LEFT),
+                    Key::Right => vm.cpu.bus.joypad.releasekey(JoypadKey::RIGHT),
+                    Key::A     => vm.cpu.bus.joypad.releasekey(JoypadKey::START),
+                    Key::S     => vm.cpu.bus.joypad.releasekey(JoypadKey::SELECT),
+                    Key::Z     => vm.cpu.bus.joypad.releasekey(JoypadKey::A),
+                    Key::X     => vm.cpu.bus.joypad.releasekey(JoypadKey::B),
+                    _ => (),
+                }
+            }
+        });
+
         if vm.run().is_err() {
             break;
         }
