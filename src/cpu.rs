@@ -571,6 +571,16 @@ impl Cpu {
                 }
                 self.regs.a = value as u8;
             }
+            Instruction::RLCA => {
+                // rotate target left
+                let value = self.get_r8(&Target::A)?;
+                let result = value << 1 | value >> 7;
+                self.regs.f.zero = result == 0;
+                self.regs.f.subtract = false;
+                self.regs.f.half_carry = false;
+                self.regs.f.carry = (value & 0x80) != 0;
+                self.set_r8(&Target::A, result)?;
+            }
         }
         self.pc += len;
         Ok(clock)

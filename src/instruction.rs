@@ -70,6 +70,7 @@ pub enum Instruction {
     CCF,
     RRA,
     DAA,
+    RLCA,
 }
 
 #[derive(Debug)]
@@ -326,6 +327,7 @@ impl Instruction {
             0x39 => Some(Instruction::ADDHL(Target::SP)),
             0x1f => Some(Instruction::RRA),
             0x27 => Some(Instruction::DAA),
+            0x07 => Some(Instruction::RLCA),
             _ => None
         }
     }
@@ -406,6 +408,7 @@ impl Instruction {
             Instruction::ADDHL(_) => 8,
             Instruction::RRA => 4,
             Instruction::DAA => 4,
+            Instruction::RLCA => 4,
         }
     }
 }
