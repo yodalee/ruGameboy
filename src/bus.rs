@@ -198,7 +198,7 @@ impl Bus {
 
     fn store(&mut self, addr: u16, value: u8) -> Result<(), ()> {
         match addr {
-            CATRIDGE_START ..= CATRIDGE_END => self.catridge.store(addr, value),
+            CATRIDGE_START ..= CATRIDGE_END => Ok(()), // catridge is read-only
             VRAM_START ..= VRAM_END => self.gpu.store(addr, value),
             RAM_START ..= RAM_END => self.ram.store(addr, value),
             OAM_START ..= OAM_END => self.gpu.store(addr, value),
