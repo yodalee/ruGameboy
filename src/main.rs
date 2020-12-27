@@ -16,6 +16,7 @@ mod bus;
 mod memory;
 mod vm;
 mod timer;
+mod joypad;
 
 use vm::{Vm, WIDTH, HEIGHT};
 
