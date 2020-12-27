@@ -85,6 +85,28 @@ impl LCDC {
     }
 }
 
+#[derive(Default,Clone,Copy,Debug)]
+pub struct Sprite {
+    /// tile_idx: sprite shows tile number
+    tile_idx: u8,
+    /// x: sprite left position
+    /// y: sprite top position
+    x: isize,
+    y: isize,
+    /// priority:
+    /// 0: on top of background and window
+    /// 1: behind color 1, 2, 3 of background and window
+    priority: bool,
+    /// flip_y: flip if 1
+    flip_y: bool,
+    /// flip: flip if 1
+    flip_x: bool,
+    /// palette_number:
+    /// 0: from OBJ0PAL
+    /// 1: from OBJ1PAL
+    palette_number: bool
+}
+
 pub struct Gpu {
     /// Clock to switch mode
     clock: u64,
@@ -109,6 +131,8 @@ pub struct Gpu {
     /// oam: 0xFE00-0xFE9F 160 bytes
     oam: Vec<u8>,
 
+    /// sprite
+    sprite: [Sprite;40],
     // whether vblank interrupt is occured
     pub is_interrupt: bool
 }
@@ -129,6 +153,7 @@ impl Gpu {
             scx: 0,
             vram: ram,
             oam: oam,
+            sprite: [Default::default();40],
             is_interrupt: false
         }
     }
@@ -156,7 +181,7 @@ impl Gpu {
         pxs
     }
 
-    pub fn build_screen(&self, buffer: &mut Vec<u32>) {
+    fn build_background(&self, buffer: &mut Vec<u32>) {
         // TODO implement (row, col) offset from (scx, scy)
         for row in 0..HEIGHT {
             let tile_row = row / 8;
@@ -169,6 +194,41 @@ impl Gpu {
                 let pixel_start = row * WIDTH + col * 8;
                 buffer.splice(pixel_start..(pixel_start + 8), pixels.iter().cloned());
             }
+        }
+    }
+
+    fn build_sprite(&self, buffer: &mut Vec<u32>) {
+        for sprite in self.sprite.iter() {
+            // check sprite intersect with screen
+            if sprite.y + 8 <= 0 || sprite.x + 9 <= 0 ||
+               (sprite.x as usize) > WIDTH || (sprite.y as usize) > HEIGHT {
+                continue;
+            }
+            for line_idx in 0..8 {
+                let y = sprite.y + line_idx as isize;
+                if y < 0 || (y as usize) > HEIGHT {
+                    continue;
+                }
+                let pixels = self.get_tile_line(sprite.tile_idx as usize, line_idx);
+                for col_idx in 0..8 {
+                    let x = sprite.x + col_idx as isize;
+                    if x < 0 || (x as usize) > WIDTH {
+                        continue;
+                    }
+                    // fill the buffer
+                    buffer[y as usize * WIDTH + x as usize] = pixels[col_idx];
+                }
+            }
+        }
+    }
+
+    pub fn build_screen(&self, buffer: &mut Vec<u32>) {
+        if self.lcdc.bg_display {
+            self.build_background(buffer);
+        }
+
+        if self.lcdc.obj_display {
+            self.build_sprite(buffer);
         }
     }
 
@@ -203,6 +263,23 @@ impl Gpu {
                     self.mode = GpuMode::ScanlineOAM;
                 }
             },
+            _ => {},
+        }
+    }
+
+    fn update_sprite(&mut self, addr: usize) {
+        let sprite_idx = addr / 4;
+        let value = self.oam[addr];
+        match addr & 0x03 {
+            0 => self.sprite[sprite_idx].y = value as isize - 16,
+            1 => self.sprite[sprite_idx].x = value as isize - 8,
+            2 => self.sprite[sprite_idx].tile_idx = value,
+            3 => {
+                self.sprite[sprite_idx].priority       = ((value >> 0x7) & 0x1) != 0;
+                self.sprite[sprite_idx].flip_y         = ((value >> 0x6) & 0x1) != 0;
+                self.sprite[sprite_idx].flip_x         = ((value >> 0x5) & 0x1) != 0;
+                self.sprite[sprite_idx].palette_number = ((value >> 0x4) & 0x1) != 0;
+            }
             _ => {},
         }
     }
@@ -246,6 +323,7 @@ impl Device for Gpu {
                 match self.oam.get_mut(addr as usize) {
                     Some(elem) => {
                         *elem = value;
+                        self.update_sprite(addr);
                         Ok(())
                     },
                     None => Err(()),
