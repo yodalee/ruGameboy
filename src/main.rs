@@ -6,7 +6,7 @@ use log::{error, debug};
 
 #[macro_use]
 extern crate num_derive;
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Window, WindowOptions, KeyRepeat};
 
 mod cpu;
 mod gpu;
@@ -44,6 +44,41 @@ fn main() -> io::Result<()> {
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
+
+        // check key press
+        window.get_keys_pressed(KeyRepeat::No).map(|keys| {
+            for key in keys {
+                match key {
+                    Key::Up    => println!("pressed up"),
+                    Key::Down  => println!("pressed down"),
+                    Key::Left  => println!("pressed left"),
+                    Key::Right => println!("pressed right"),
+                    Key::A     => println!("pressed Start"),
+                    Key::S     => println!("pressed Select"),
+                    Key::Z     => println!("pressed A"),
+                    Key::X     => println!("pressed B"),
+                    _ => (),
+                }
+            }
+        });
+
+        // check key release
+        window.get_keys_released().map(|keys| {
+            for key in keys {
+                match key {
+                    Key::Up    => println!("released up"),
+                    Key::Down  => println!("released down"),
+                    Key::Left  => println!("released left"),
+                    Key::Right => println!("released right"),
+                    Key::A     => println!("released Start"),
+                    Key::S     => println!("released Select"),
+                    Key::Z     => println!("released A"),
+                    Key::X     => println!("released B"),
+                    _ => (),
+                }
+            }
+        });
+
         if vm.run().is_err() {
             break;
         }
