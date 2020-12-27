@@ -8,6 +8,8 @@ const WHITE: u32 = 0x00FFFFFFu32;
 
 pub const VRAM_START:     u16 = 0x8000;
 pub const VRAM_END:       u16 = 0x9fff;
+pub const OAM_START:      u16 = 0xfe00;
+pub const OAM_END:        u16 = 0xfe9f;
 
 #[derive(PartialEq)]
 pub enum GpuMode {
@@ -21,6 +23,7 @@ pub enum GpuMode {
     VBlank,
 }
 
+#[derive(Debug,Clone,Copy)]
 pub struct LCDC {
     /// LCD control operation
     /// false: stop
@@ -82,6 +85,28 @@ impl LCDC {
     }
 }
 
+#[derive(Default,Clone,Copy,Debug)]
+pub struct Sprite {
+    /// tile_idx: sprite shows tile number
+    tile_idx: u8,
+    /// x: sprite left position
+    /// y: sprite top position
+    x: isize,
+    y: isize,
+    /// priority:
+    /// 0: on top of background and window
+    /// 1: behind color 1, 2, 3 of background and window
+    priority: bool,
+    /// flip_y: flip if 1
+    flip_y: bool,
+    /// flip: flip if 1
+    flip_x: bool,
+    /// palette_number:
+    /// 0: from OBJ0PAL
+    /// 1: from OBJ1PAL
+    palette_number: bool
+}
+
 pub struct Gpu {
     /// Clock to switch mode
     clock: u64,
@@ -103,7 +128,11 @@ pub struct Gpu {
     pub scx: u8,
     /// vram: 0x8000-0x9BFF 6144 bytes
     vram: Vec<u8>,
+    /// oam: 0xFE00-0xFE9F 160 bytes
+    oam: Vec<u8>,
 
+    /// sprite
+    sprite: [Sprite;40],
     // whether vblank interrupt is occured
     pub is_interrupt: bool
 }
@@ -111,6 +140,7 @@ pub struct Gpu {
 impl Gpu {
     pub fn new() -> Self {
         let ram = vec![0; (VRAM_END - VRAM_START + 1) as usize];
+        let oam = vec![0; (OAM_END - OAM_START + 1) as usize];
         Self {
             clock: 0,
             line: 0,
@@ -122,6 +152,8 @@ impl Gpu {
             scy: 0,
             scx: 0,
             vram: ram,
+            oam: oam,
+            sprite: [Default::default();40],
             is_interrupt: false
         }
     }
@@ -149,7 +181,7 @@ impl Gpu {
         pxs
     }
 
-    pub fn build_screen(&self, buffer: &mut Vec<u32>) {
+    fn build_background(&self, buffer: &mut Vec<u32>) {
         // TODO implement (row, col) offset from (scx, scy)
         for row in 0..HEIGHT {
             let tile_row = row / 8;
@@ -162,6 +194,41 @@ impl Gpu {
                 let pixel_start = row * WIDTH + col * 8;
                 buffer.splice(pixel_start..(pixel_start + 8), pixels.iter().cloned());
             }
+        }
+    }
+
+    fn build_sprite(&self, buffer: &mut Vec<u32>) {
+        for sprite in self.sprite.iter() {
+            // check sprite intersect with screen
+            if sprite.y + 8 <= 0 || sprite.x + 9 <= 0 ||
+               (sprite.x as usize) > WIDTH || (sprite.y as usize) > HEIGHT {
+                continue;
+            }
+            for line_idx in 0..8 {
+                let y = sprite.y + line_idx as isize;
+                if y < 0 || (y as usize) > HEIGHT {
+                    continue;
+                }
+                let pixels = self.get_tile_line(sprite.tile_idx as usize, line_idx);
+                for col_idx in 0..8 {
+                    let x = sprite.x + col_idx as isize;
+                    if x < 0 || (x as usize) > WIDTH {
+                        continue;
+                    }
+                    // fill the buffer
+                    buffer[y as usize * WIDTH + x as usize] = pixels[col_idx];
+                }
+            }
+        }
+    }
+
+    pub fn build_screen(&self, buffer: &mut Vec<u32>) {
+        if self.lcdc.bg_display {
+            self.build_background(buffer);
+        }
+
+        if self.lcdc.obj_display {
+            self.build_sprite(buffer);
         }
     }
 
@@ -199,25 +266,70 @@ impl Gpu {
             _ => {},
         }
     }
+
+    fn update_sprite(&mut self, addr: usize) {
+        let sprite_idx = addr / 4;
+        let value = self.oam[addr];
+        match addr & 0x03 {
+            0 => self.sprite[sprite_idx].y = value as isize - 16,
+            1 => self.sprite[sprite_idx].x = value as isize - 8,
+            2 => self.sprite[sprite_idx].tile_idx = value,
+            3 => {
+                self.sprite[sprite_idx].priority       = ((value >> 0x7) & 0x1) != 0;
+                self.sprite[sprite_idx].flip_y         = ((value >> 0x6) & 0x1) != 0;
+                self.sprite[sprite_idx].flip_x         = ((value >> 0x5) & 0x1) != 0;
+                self.sprite[sprite_idx].palette_number = ((value >> 0x4) & 0x1) != 0;
+            }
+            _ => {},
+        }
+    }
 }
 
 impl Device for Gpu {
     fn load(&self, addr: u16) -> Result<u8, ()> {
-        let addr = (addr - VRAM_START) as usize;
-        match self.vram.get(addr) {
-            Some(elem) => Ok(*elem),
-            None => Err(()),
+        match addr {
+            VRAM_START ..= VRAM_END => {
+                let addr = (addr - VRAM_START) as usize;
+                match self.vram.get(addr) {
+                    Some(elem) => Ok(*elem),
+                    None => Err(()),
+                }
+            }
+            OAM_START ..= OAM_END => {
+                let addr = (addr - OAM_START) as usize;
+                match self.oam.get(addr) {
+                    Some(elem) => Ok(*elem),
+                    None => Err(()),
+                }
+            }
+            _ => Err(()),
         }
     }
 
     fn store(&mut self, addr: u16, value: u8) -> Result<(), ()> {
-        let addr = (addr - VRAM_START) as usize;
-        match self.vram.get_mut(addr as usize) {
-            Some(elem) => {
-                *elem = value;
-                Ok(())
-            },
-            None => Err(()),
+        match addr {
+            VRAM_START ..= VRAM_END => {
+                let addr = (addr - VRAM_START) as usize;
+                match self.vram.get_mut(addr as usize) {
+                    Some(elem) => {
+                        *elem = value;
+                        Ok(())
+                    },
+                    None => Err(()),
+                }
+            }
+            OAM_START ..= OAM_END => {
+                let addr = (addr - OAM_START) as usize;
+                match self.oam.get_mut(addr as usize) {
+                    Some(elem) => {
+                        *elem = value;
+                        self.update_sprite(addr);
+                        Ok(())
+                    },
+                    None => Err(()),
+                }
+            }
+            _ => Err(()),
         }
     }
 }
