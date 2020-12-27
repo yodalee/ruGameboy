@@ -533,7 +533,7 @@ impl Cpu {
                 self.regs.f.subtract = false;
                 self.regs.f.half_carry = ((hl & 0xfff) + (value & 0xfff)) & 0x1000 != 0;
                 self.regs.f.carry = (hl as u32) + (value as u32) > 0xffff;
-                self.regs.set_hl(hl + value);
+                self.regs.set_hl(hl.wrapping_add(value));
             }
             Instruction::RRA => {
                 let value = self.regs.a;
