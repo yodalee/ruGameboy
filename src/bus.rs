@@ -1,4 +1,4 @@
-use crate::memory::Memory;
+use crate::memory::{Memory, Permission};
 use crate::gpu::{Gpu, LCDC, VRAM_START, VRAM_END, OAM_START, OAM_END};
 use crate::timer::{Timer, TIMER_START, TIMER_END};
 use crate::joypad::{Joypad, JOYPAD_ADDR};
@@ -130,19 +130,21 @@ pub struct Bus {
     pub timer: Timer,
     ram: Memory,
     hram: Memory,
+    unusable: Memory,
     pub interruptenb: InterruptFlag,
     pub joypad: Joypad,
 }
 
 impl Bus {
     pub fn new(binary: Vec<u8>) -> Self {
-        let catridge = Memory::new(0, binary);
+        let catridge = Memory::new(0, binary, Permission::ReadOnly);
         Self {
             catridge: catridge,
             gpu: Gpu::new(),
             timer: Timer::new(),
-            ram: Memory::new_empty(RAM_START as usize, (RAM_END - RAM_START + 1) as usize),
-            hram: Memory::new_empty(HRAM_START as usize, (HRAM_END - HRAM_START + 1) as usize),
+            ram: Memory::new_empty(RAM_START as usize, (RAM_END - RAM_START + 1) as usize, Permission::Normal),
+            hram: Memory::new_empty(HRAM_START as usize, (HRAM_END - HRAM_START + 1) as usize, Permission::Normal),
+            unusable: Memory::new_empty(UNUSABLE_START as usize, (UNUSABLE_END - UNUSABLE_START + 1) as usize, Permission::Invalid),
             joypad: Joypad::new(),
             interruptenb: Default::default(),
         }
@@ -158,77 +160,89 @@ impl Bus {
         self.timer.is_interrupt = (value >> TIMER_SHIFT)  & 0x4 != 0;
     }
 
-    fn load(&self, addr: u16) -> Result<u8, ()> {
+    fn find_device(&self, addr: u16) -> Option<&dyn Device> {
         match addr {
-            CATRIDGE_START ..= CATRIDGE_END => self.catridge.load(addr),
-            VRAM_START ..= VRAM_END => self.gpu.load(addr),
-            RAM_START ..= RAM_END => self.ram.load(addr),
-            OAM_START ..= OAM_END => self.gpu.load(addr),
-            UNUSABLE_START ..= UNUSABLE_END => {
-                info!("Load at unusable address {:#X}", addr);
-                Ok(0)
-            }
-            HRAM_START ..= HRAM_END => self.hram.load(addr),
-            TIMER_START ..= TIMER_END => self.timer.load(addr),
-            JOYPAD_ADDR => self.joypad.load(addr),
-            INT => Ok(self.load_interrupt()),
-            INTENB => Ok(u8::from(&self.interruptenb)),
-            _ => {
-                // match IO line
-                match FromPrimitive::from_u16(addr) {
-                    Some(IO::LCDC) => Ok(self.gpu.lcdc.to_u8()),
-                    Some(IO::SCY) => Ok(self.gpu.scy),
-                    Some(IO::SCX) => Ok(self.gpu.scx),
-                    Some(IO::LY) => Ok(self.gpu.line),
-                    Some(IO::BGP) => Ok(self.gpu.bg_palette),
-                    Some(IO::OBP0) => Ok(self.gpu.ob0_palette),
-                    Some(IO::OBP1) => Ok(self.gpu.ob1_palette),
-                    Some(_) => {
-                        info!("Unimplemented load on address {:#X}", addr);
-                        Ok(0)
-                    },
-                    None => {
-                        error!("Invalid load on address {:#X}", addr);
-                        Err(())
+            CATRIDGE_START ..= CATRIDGE_END => Some(&self.catridge),
+            VRAM_START ..= VRAM_END => Some(&self.gpu),
+            RAM_START ..= RAM_END => Some(&self.ram),
+            OAM_START ..= OAM_END => Some(&self.gpu),
+            HRAM_START ..= HRAM_END => Some(&self.hram),
+            TIMER_START ..= TIMER_END => Some(&self.timer),
+            JOYPAD_ADDR => Some(&self.joypad),
+            UNUSABLE_START ..= UNUSABLE_END => Some(&self.unusable),
+            _ => return None,
+        }
+    }
+
+    fn load(&self, addr: u16) -> Result<u8, ()> {
+        match self.find_device(addr) {
+            Some(dev) => dev.load(addr),
+            None => match addr {
+                INT => Ok(self.load_interrupt()),
+                INTENB => Ok(u8::from(&self.interruptenb)),
+                _ => {
+                    // match IO line
+                    match FromPrimitive::from_u16(addr) {
+                        Some(IO::LCDC) => Ok(self.gpu.lcdc.to_u8()),
+                        Some(IO::SCY) => Ok(self.gpu.scy),
+                        Some(IO::SCX) => Ok(self.gpu.scx),
+                        Some(IO::LY) => Ok(self.gpu.line),
+                        Some(IO::BGP) => Ok(self.gpu.bg_palette),
+                        Some(IO::OBP0) => Ok(self.gpu.ob0_palette),
+                        Some(IO::OBP1) => Ok(self.gpu.ob1_palette),
+                        Some(_) => {
+                            info!("Unimplemented load on address {:#X}", addr);
+                            Ok(0)
+                        },
+                        None => {
+                            error!("Invalid load on address {:#X}", addr);
+                            Err(())
+                        }
                     }
                 }
             }
         }
     }
 
-    fn store(&mut self, addr: u16, value: u8) -> Result<(), ()> {
+    fn find_device_mut(&mut self, addr: u16) -> Option<&mut dyn Device> {
         match addr {
-            CATRIDGE_START ..= CATRIDGE_END => Ok(()), // catridge is read-only
-            VRAM_START ..= VRAM_END => self.gpu.store(addr, value),
-            RAM_START ..= RAM_END => self.ram.store(addr, value),
-            OAM_START ..= OAM_END => self.gpu.store(addr, value),
-            UNUSABLE_START ..= UNUSABLE_END => {
-                info!("Write at unusable address {:#X}", addr);
-                Ok(())
-            }
-            HRAM_START ..= HRAM_END => self.hram.store(addr, value),
-            TIMER_START ..= TIMER_END => self.timer.store(addr, value),
-            JOYPAD_ADDR => self.joypad.store(addr, value),
-            INT => Ok(self.store_interrupt(value)),
-            INTENB => Ok(self.interruptenb = InterruptFlag::from(value)),
-            _ => {
-                // match IO line
-                match FromPrimitive::from_u16(addr) {
-                    Some(IO::LCDC) => self.gpu.lcdc = LCDC::from_u8(value),
-                    Some(IO::SCY) => self.gpu.scy = value,
-                    Some(IO::SCX) => self.gpu.scx = value,
-                    Some(IO::LY) => self.gpu.line = 0,
-                    Some(IO::DMA) => self.dma(value),
-                    Some(IO::BGP) => self.gpu.bg_palette = value,
-                    Some(IO::OBP0) => self.gpu.ob0_palette = value,
-                    Some(IO::OBP1) => self.gpu.ob1_palette = value,
-                    Some(_) => {},
-                    None => {
-                        error!("Invalid store to address {:#X}", addr);
-                        return Err(())
+            VRAM_START ..= VRAM_END => Some(&mut self.gpu),
+            RAM_START ..= RAM_END => Some(&mut self.ram),
+            OAM_START ..= OAM_END => Some(&mut self.gpu),
+            HRAM_START ..= HRAM_END => Some(&mut self.hram),
+            TIMER_START ..= TIMER_END => Some(&mut self.timer),
+            JOYPAD_ADDR => Some(&mut self.joypad),
+            CATRIDGE_START ..= CATRIDGE_END => Some(&mut self.catridge),
+            UNUSABLE_START ..= UNUSABLE_END => Some(&mut self.unusable),
+            _ => return None,
+        }
+    }
+
+    fn store(&mut self, addr: u16, value: u8) -> Result<(), ()> {
+        match self.find_device_mut(addr) {
+            Some(dev) => dev.store(addr, value),
+            None => match addr {
+                INT => Ok(self.store_interrupt(value)),
+                INTENB => Ok(self.interruptenb = InterruptFlag::from(value)),
+                _ => {
+                    // match IO line
+                    match FromPrimitive::from_u16(addr) {
+                        Some(IO::LCDC) => self.gpu.lcdc = LCDC::from_u8(value),
+                        Some(IO::SCY) => self.gpu.scy = value,
+                        Some(IO::SCX) => self.gpu.scx = value,
+                        Some(IO::LY) => self.gpu.line = 0,
+                        Some(IO::DMA) => self.dma(value),
+                        Some(IO::BGP) => self.gpu.bg_palette = value,
+                        Some(IO::OBP0) => self.gpu.ob0_palette = value,
+                        Some(IO::OBP1) => self.gpu.ob1_palette = value,
+                        Some(_) => {},
+                        None => {
+                            error!("Invalid store to address {:#X}", addr);
+                            return Err(())
+                        }
                     }
+                    Ok(())
                 }
-                Ok(())
             }
         }
     }
