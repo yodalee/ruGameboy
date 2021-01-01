@@ -1,5 +1,5 @@
 use crate::bus::Device;
-use log::error;
+use log::info;
 
 pub enum Permission {
     Normal,
