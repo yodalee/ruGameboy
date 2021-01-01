@@ -204,19 +204,21 @@ impl Gpu {
                (sprite.x as usize) > WIDTH || (sprite.y as usize) > HEIGHT {
                 continue;
             }
-            for line_idx in 0..8 {
-                let y = sprite.y + line_idx as isize;
+            for row_idx in 0..8 {
+                let y = sprite.y + row_idx as isize;
                 if y < 0 || (y as usize) > HEIGHT {
                     continue;
                 }
-                let pixels = self.get_tile_line(sprite.tile_idx as usize, line_idx);
+                let y_idx = if sprite.flip_y { 7-row_idx } else { row_idx };
+                let pixels = self.get_tile_line(sprite.tile_idx as usize, y_idx);
                 for col_idx in 0..8 {
                     let x = sprite.x + col_idx as isize;
                     if x < 0 || (x as usize) > WIDTH {
                         continue;
                     }
+                    let x_idx = if sprite.flip_x { 7-col_idx } else { col_idx };
                     // fill the buffer
-                    buffer[y as usize * WIDTH + x as usize] = pixels[col_idx];
+                    buffer[y as usize * WIDTH + x as usize] = pixels[x_idx];
                 }
             }
         }
