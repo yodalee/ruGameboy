@@ -556,7 +556,7 @@ impl Cpu {
                         value -= 0x60;
                     }
                 } else {
-                    if self.regs.f.half_carry || value & 0xf > 0 {
+                    if self.regs.f.half_carry || (value & 0xf) > 9 {
                         value += 0x06;
                     }
                     if self.regs.f.carry || value > 0x9F {
