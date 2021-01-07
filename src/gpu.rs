@@ -182,12 +182,13 @@ impl Gpu {
     }
 
     fn build_background(&self, buffer: &mut Vec<u32>) {
-        // TODO implement (row, col) offset from (scx, scy)
         for row in 0..HEIGHT {
-            let tile_row = row / 8;
-            let line_idx = row % 8;
+            let offset_row = row + self.scy as usize;
+            let tile_row = offset_row / 8;
+            let line_idx = offset_row % 8;
             for col in 0..(WIDTH/8) {
-                let tile_addr = tile_row * 32 + col + (0x9800 - 0x8000);
+                let offset_col = col + self.scx as usize;
+                let tile_addr = tile_row * 32 + offset_col + (0x9800 - 0x8000);
                 let tile_idx = self.vram[tile_addr] as usize;
                 let pixels = self.get_tile_line(tile_idx, line_idx);
 
