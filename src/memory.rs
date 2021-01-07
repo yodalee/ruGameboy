@@ -14,21 +14,25 @@ pub struct Memory {
 }
 
 impl Memory {
-    pub fn new(base: usize, binary: Vec<u8>, perm: Permission) -> Self {
-        Self {
-            base: base,
-            memory: binary.clone(),
-            permission: perm,
-        }
-    }
-
-    pub fn new_empty(base: usize, size: usize, perm: Permission) -> Self {
-        let memory = vec![0; size];
-        Self {
+    pub fn new(base: usize, size: usize, binary: Vec<u8>, perm: Permission) -> Box<Self> {
+        let mut memory = binary.clone();
+        let rest = size - memory.len();
+        let mut empty = vec![0; rest];
+        memory.append(&mut empty);
+        Box::new(Self {
             base: base,
             memory: memory,
             permission: perm,
-        }
+        })
+    }
+
+    pub fn new_empty(base: usize, size: usize, perm: Permission) -> Box<Self> {
+        let memory = vec![0; size];
+        Box::new(Self {
+            base: base,
+            memory: memory,
+            permission: perm,
+        })
     }
 
 }
@@ -70,5 +74,10 @@ impl Device for Memory {
                 Ok(())
             },
         }
+    }
+    fn range(&self) -> (u16, u16) {
+        let start = self.base as u16;
+        let end = start + self.memory.len() as u16 - 1;
+        (start, end)
     }
 }

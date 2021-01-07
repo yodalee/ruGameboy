@@ -128,4 +128,8 @@ impl Device for Timer {
         }
         Ok(())
     }
+
+    fn range(&self) -> (u16, u16) {
+        (0, 0)
+    }
 }

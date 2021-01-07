@@ -332,4 +332,8 @@ impl Device for Gpu {
             _ => Err(()),
         }
     }
+
+    fn range(&self) -> (u16, u16) {
+        (0, 0)
+    }
 }

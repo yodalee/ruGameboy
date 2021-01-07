@@ -68,4 +68,8 @@ impl Device for Joypad {
         self.mask = value;
         Ok(())
     }
+
+    fn range(&self) -> (u16, u16) {
+        (0, 0)
+    }
 }

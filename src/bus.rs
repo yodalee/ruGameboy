@@ -5,7 +5,7 @@ use crate::joypad::{Joypad, JOYPAD_ADDR};
 
 use num_traits::FromPrimitive;
 use num_derive::FromPrimitive;
-use log::{error, info};
+use log::{error, info, debug};
 
 /// memory map of LR35902, xxx_START to xxx_END inclusive
 const CATRIDGE_START: u16 = 0x0000;
@@ -122,29 +122,32 @@ enum IO {
 pub trait Device {
     fn load(&self, addr: u16) -> Result<u8, ()>;
     fn store(&mut self, addr: u16, value: u8) -> Result<(), ()>;
+    fn range(&self) -> (u16, u16);
 }
 
 pub struct Bus {
-    catridge: Memory,
+    storage: Vec<Box<dyn Device>>,
     pub gpu: Gpu,
     pub timer: Timer,
-    ram: Memory,
-    hram: Memory,
-    unusable: Memory,
-    pub interruptenb: InterruptFlag,
     pub joypad: Joypad,
+    pub interruptenb: InterruptFlag,
 }
 
 impl Bus {
     pub fn new(binary: Vec<u8>) -> Self {
-        let catridge = Memory::new(0, binary, Permission::ReadOnly);
+        let catridge = Memory::new(CATRIDGE_START as usize, (CATRIDGE_END - CATRIDGE_START + 1) as usize, binary, Permission::ReadOnly);
+        let ram = Memory::new_empty(RAM_START as usize, (RAM_END - RAM_START + 1) as usize, Permission::Normal);
+        let hram = Memory::new_empty(HRAM_START as usize, (HRAM_END - HRAM_START + 1) as usize, Permission::Normal);
+        let unusable = Memory::new_empty(UNUSABLE_START as usize, (UNUSABLE_END - UNUSABLE_START + 1) as usize, Permission::Invalid);
+        let mut storage:Vec<Box<dyn Device>> = Vec::new();
+        storage.push(catridge);
+        storage.push(ram);
+        storage.push(hram);
+        storage.push(unusable);
         Self {
-            catridge: catridge,
+            storage: storage,
             gpu: Gpu::new(),
             timer: Timer::new(),
-            ram: Memory::new_empty(RAM_START as usize, (RAM_END - RAM_START + 1) as usize, Permission::Normal),
-            hram: Memory::new_empty(HRAM_START as usize, (HRAM_END - HRAM_START + 1) as usize, Permission::Normal),
-            unusable: Memory::new_empty(UNUSABLE_START as usize, (UNUSABLE_END - UNUSABLE_START + 1) as usize, Permission::Invalid),
             joypad: Joypad::new(),
             interruptenb: Default::default(),
         }
@@ -160,21 +163,38 @@ impl Bus {
         self.timer.is_interrupt = (value >> TIMER_SHIFT)  & 0x4 != 0;
     }
 
+    fn find_storage(&self, addr: u16) -> Option<&Box<dyn Device>> {
+        let matched: Vec<&Box<dyn Device>> = self.storage
+                                                .iter()
+                                                .filter(|dev| {
+                                                    let (start, end) = dev.range();
+                                                    start <= addr && addr <= end
+                                                }).collect();
+        match matched.len() {
+            0 => return None,
+            1 => return Some(matched[0]),
+            _ => {
+                error!("Multiple device defined on address {:#X}", addr);
+                std::process::exit(1);
+            },
+        }
+    }
+
     fn find_device(&self, addr: u16) -> Option<&dyn Device> {
         match addr {
-            CATRIDGE_START ..= CATRIDGE_END => Some(&self.catridge),
             VRAM_START ..= VRAM_END => Some(&self.gpu),
-            RAM_START ..= RAM_END => Some(&self.ram),
             OAM_START ..= OAM_END => Some(&self.gpu),
-            HRAM_START ..= HRAM_END => Some(&self.hram),
             TIMER_START ..= TIMER_END => Some(&self.timer),
             JOYPAD_ADDR => Some(&self.joypad),
-            UNUSABLE_START ..= UNUSABLE_END => Some(&self.unusable),
             _ => return None,
         }
     }
 
     fn load(&self, addr: u16) -> Result<u8, ()> {
+        if let Some(dev) = self.find_storage(addr) {
+            return dev.load(addr);
+        }
+
         match self.find_device(addr) {
             Some(dev) => dev.load(addr),
             None => match addr {
@@ -204,21 +224,40 @@ impl Bus {
         }
     }
 
+    fn find_storage_mut(&mut self, addr: u16) -> Option<&mut Box<dyn Device>> {
+        let mut matched: Vec<&mut Box<dyn Device>> = self.storage
+                                                .iter_mut()
+                                                .filter(|dev| {
+                                                    let (start, end) = dev.range();
+                                                    start <= addr && addr <= end
+                                                }).collect();
+        match matched.len() {
+            0 => None,
+            1 => {
+                Some(matched.pop().unwrap())
+            },
+            _ => {
+                error!("Multiple device defined on address {:#X}", addr);
+                std::process::exit(1);
+            },
+        }
+    }
+
     fn find_device_mut(&mut self, addr: u16) -> Option<&mut dyn Device> {
         match addr {
             VRAM_START ..= VRAM_END => Some(&mut self.gpu),
-            RAM_START ..= RAM_END => Some(&mut self.ram),
             OAM_START ..= OAM_END => Some(&mut self.gpu),
-            HRAM_START ..= HRAM_END => Some(&mut self.hram),
             TIMER_START ..= TIMER_END => Some(&mut self.timer),
             JOYPAD_ADDR => Some(&mut self.joypad),
-            CATRIDGE_START ..= CATRIDGE_END => Some(&mut self.catridge),
-            UNUSABLE_START ..= UNUSABLE_END => Some(&mut self.unusable),
             _ => return None,
         }
     }
 
     fn store(&mut self, addr: u16, value: u8) -> Result<(), ()> {
+        if let Some(dev) = self.find_storage_mut(addr) {
+            return dev.store(addr, value);
+        }
+
         match self.find_device_mut(addr) {
             Some(dev) => dev.store(addr, value),
             None => match addr {
