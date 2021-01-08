@@ -5,7 +5,7 @@ use crate::joypad::{Joypad, JOYPAD_ADDR};
 
 use num_traits::FromPrimitive;
 use num_derive::FromPrimitive;
-use log::{error, info, debug};
+use log::{error, info};
 
 /// memory map of LR35902, xxx_START to xxx_END inclusive
 const CATRIDGE_START: u16 = 0x0000;
@@ -164,20 +164,13 @@ impl Bus {
     }
 
     fn find_storage(&self, addr: u16) -> Option<&Box<dyn Device>> {
-        let matched: Vec<&Box<dyn Device>> = self.storage
-                                                .iter()
-                                                .filter(|dev| {
-                                                    let (start, end) = dev.range();
-                                                    start <= addr && addr <= end
-                                                }).collect();
-        match matched.len() {
-            0 => return None,
-            1 => return Some(matched[0]),
-            _ => {
-                error!("Multiple device defined on address {:#X}", addr);
-                std::process::exit(1);
-            },
+        for dev in self.storage.iter() {
+            let (start, end) = dev.range();
+            if start <= addr && addr <= end {
+                return Some(dev);
+            }
         }
+        None
     }
 
     fn find_device(&self, addr: u16) -> Option<&dyn Device> {
@@ -225,22 +218,13 @@ impl Bus {
     }
 
     fn find_storage_mut(&mut self, addr: u16) -> Option<&mut Box<dyn Device>> {
-        let mut matched: Vec<&mut Box<dyn Device>> = self.storage
-                                                .iter_mut()
-                                                .filter(|dev| {
-                                                    let (start, end) = dev.range();
-                                                    start <= addr && addr <= end
-                                                }).collect();
-        match matched.len() {
-            0 => None,
-            1 => {
-                Some(matched.pop().unwrap())
-            },
-            _ => {
-                error!("Multiple device defined on address {:#X}", addr);
-                std::process::exit(1);
-            },
+        for dev in self.storage.iter_mut() {
+            let (start, end) = dev.range();
+            if start <= addr && addr <= end {
+                return Some(dev);
+            }
         }
+        None
     }
 
     fn find_device_mut(&mut self, addr: u16) -> Option<&mut dyn Device> {
