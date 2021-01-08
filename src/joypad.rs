@@ -70,6 +70,6 @@ impl Device for Joypad {
     }
 
     fn range(&self) -> (u16, u16) {
-        (0, 0)
+        (JOYPAD_ADDR, JOYPAD_ADDR)
     }
 }

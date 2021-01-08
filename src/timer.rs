@@ -130,6 +130,6 @@ impl Device for Timer {
     }
 
     fn range(&self) -> (u16, u16) {
-        (0, 0)
+        (TIMER_START, TIMER_END)
     }
 }
