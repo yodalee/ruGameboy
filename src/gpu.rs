@@ -333,7 +333,9 @@ impl Device for Gpu {
         }
     }
 
-    fn range(&self) -> (u16, u16) {
-        (0, 0)
+    fn is_contain(&self, addr: u16) -> bool {
+        // TODO: Transfer control of lcdc, scy, scx, etc. to gpu
+        // and share this interface with them.
+        false
     }
 }

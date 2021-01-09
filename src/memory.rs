@@ -75,9 +75,10 @@ impl Device for Memory {
             },
         }
     }
-    fn range(&self) -> (u16, u16) {
+
+    fn is_contain(&self, addr: u16) -> bool {
         let start = self.base as u16;
         let end = start + self.memory.len() as u16 - 1;
-        (start, end)
+        start <= addr && addr <= end
     }
 }

@@ -69,7 +69,7 @@ impl Device for Joypad {
         Ok(())
     }
 
-    fn range(&self) -> (u16, u16) {
-        (JOYPAD_ADDR, JOYPAD_ADDR)
+    fn is_contain(&self, addr: u16) -> bool {
+        addr == JOYPAD_ADDR
     }
 }

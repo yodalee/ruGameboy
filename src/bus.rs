@@ -122,7 +122,7 @@ enum IO {
 pub trait Device {
     fn load(&self, addr: u16) -> Result<u8, ()>;
     fn store(&mut self, addr: u16, value: u8) -> Result<(), ()>;
-    fn range(&self) -> (u16, u16);
+    fn is_contain(&self, addr: u16) -> bool;
 }
 
 pub struct Bus {
@@ -165,8 +165,7 @@ impl Bus {
 
     fn find_storage(&self, addr: u16) -> Option<&Box<dyn Device>> {
         for dev in self.storage.iter() {
-            let (start, end) = dev.range();
-            if start <= addr && addr <= end {
+            if dev.is_contain(addr) {
                 return Some(dev);
             }
         }
@@ -219,8 +218,7 @@ impl Bus {
 
     fn find_storage_mut(&mut self, addr: u16) -> Option<&mut Box<dyn Device>> {
         for dev in self.storage.iter_mut() {
-            let (start, end) = dev.range();
-            if start <= addr && addr <= end {
+            if dev.is_contain(addr) {
                 return Some(dev);
             }
         }

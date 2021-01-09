@@ -129,7 +129,7 @@ impl Device for Timer {
         Ok(())
     }
 
-    fn range(&self) -> (u16, u16) {
-        (TIMER_START, TIMER_END)
+    fn is_contain(&self, addr :u16) -> bool {
+        TIMER_START <= addr && addr <= TIMER_END
     }
 }
