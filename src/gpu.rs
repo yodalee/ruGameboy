@@ -158,7 +158,7 @@ impl Gpu {
         }
     }
 
-    pub fn get_tile_line(&self, tile_idx: usize, line_idx: usize) -> Vec<u32> {
+    pub fn get_tile_line(&self, tile_idx: usize, line_idx: usize) -> Vec<u8> {
         assert!(line_idx < 8);
         let addr = (tile_idx * 8 + line_idx) * 2;
 
@@ -168,17 +168,32 @@ impl Gpu {
         let mut pxs = Vec::with_capacity(8);
 
         for j in (0..8).rev() {
-            let bit1 = ((byte1 >> j) & 0x1) == 0;
-            let bit2 = ((byte2 >> j) & 0x1) == 0;
-            let color = match (bit1, bit2) {
-                (false, false) => BLACK,
-                (false, true) => DGRAY,
-                (true, false) => LGRAY,
-                (true, true) => WHITE,
-            };
-            pxs.push(color);
+            let bit1 = (byte1 >> j) & 0x1;
+            let bit2 = (byte2 >> j) & 0x1;
+            let pixel = bit1 << 1 | bit2;
+            pxs.push(pixel);
         }
         pxs
+    }
+
+    fn pixel_to_color(&self, pixel: u8) -> u32 {
+        match pixel {
+            3 => BLACK,
+            2 => DGRAY,
+            1 => LGRAY,
+            0 => WHITE,
+            _ => panic!("Invalid value in u8_to_grayscale"),
+        }
+    }
+
+    fn pixel_map_by_palette(&self, palette: u8, pixel: u8) -> u8 {
+        match pixel {
+            3 => (palette >> 6) & 0x3,
+            2 => (palette >> 4) & 0x3,
+            1 => (palette >> 2) & 0x3,
+            0 => (palette >> 0) & 0x3,
+            _ => panic!("Invalid value in u8_from_palette"),
+        }
     }
 
     fn build_background(&self, buffer: &mut Vec<u32>) {
@@ -193,7 +208,10 @@ impl Gpu {
                 let pixels = self.get_tile_line(tile_idx, line_idx);
 
                 let pixel_start = row * WIDTH + col * 8;
-                buffer.splice(pixel_start..(pixel_start + 8), pixels.iter().cloned());
+                buffer.splice(pixel_start..(pixel_start + 8),
+                      pixels.iter()
+                            .map(|p| self.pixel_map_by_palette(self.bg_palette, *p))
+                            .map(|p| self.pixel_to_color(p)));
             }
         }
     }
@@ -205,6 +223,13 @@ impl Gpu {
                (sprite.x as usize) > WIDTH || (sprite.y as usize) > HEIGHT {
                 continue;
             }
+
+            let palette = if sprite.palette_number {
+                self.ob1_palette
+            } else {
+                self.ob0_palette
+            };
+
             for row_idx in 0..8 {
                 let y = sprite.y + row_idx as isize;
                 if y < 0 || (y as usize) > HEIGHT {
@@ -219,7 +244,11 @@ impl Gpu {
                     }
                     let x_idx = if sprite.flip_x { 7-col_idx } else { col_idx };
                     // fill the buffer
-                    buffer[y as usize * WIDTH + x as usize] = pixels[x_idx];
+                    let dibit = self.pixel_map_by_palette(palette, pixels[x_idx]);
+                    if dibit != 0 {
+                        let color = self.pixel_to_color(dibit);
+                        buffer[y as usize * WIDTH + x as usize] = color;
+                    }
                 }
             }
         }
