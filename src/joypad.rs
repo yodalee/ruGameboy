@@ -16,7 +16,8 @@ pub enum JoypadKey {
 pub struct Joypad {
     p14: u8,
     p15: u8,
-    mask: u8
+    mask: u8,
+    pub is_interrupt: bool,
 }
 
 impl Joypad {
@@ -25,6 +26,7 @@ impl Joypad {
             p14: 0x0F,
             p15: 0x0F,
             mask: 0x30,
+            is_interrupt: false,
         }
     }
 
@@ -39,6 +41,7 @@ impl Joypad {
             JoypadKey::SELECT => self.p15 &= !0x04,
             JoypadKey::START  => self.p15 &= !0x08,
         }
+        self.is_interrupt = true;
     }
 
     pub fn releasekey(&mut self, key: JoypadKey) {

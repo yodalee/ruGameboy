@@ -143,6 +143,18 @@ impl Cpu {
             self.interrupt_state = InterruptState::IDisable;
             return self.execute(Instruction::RST(0x40))
         }
+        if self.bus.interruptenb.timer && self.bus.timer.is_interrupt {
+            debug!("Timer Interrupt");
+            self.bus.timer.is_interrupt = false;
+            self.interrupt_state = InterruptState::IDisable;
+            return self.execute(Instruction::RST(0x48))
+        }
+        if self.bus.interruptenb.joypad && self.bus.joypad.is_interrupt {
+            debug!("Joypad Interrupt");
+            self.bus.joypad.is_interrupt = false;
+            self.interrupt_state = InterruptState::IDisable;
+            return self.execute(Instruction::RST(0x60))
+        }
         Ok(0)
     }
 

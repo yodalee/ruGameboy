@@ -151,13 +151,15 @@ impl Bus {
     }
 
     fn load_interrupt(&self) -> u8 {
-       ( if self.gpu.is_interrupt   { 1 << VBLANK_SHIFT } else { 0 } ) |
-       ( if self.timer.is_interrupt { 1 << TIMER_SHIFT  } else { 0 } )
+       ( if self.gpu.is_interrupt    { 1 << VBLANK_SHIFT } else { 0 } ) |
+       ( if self.timer.is_interrupt  { 1 << TIMER_SHIFT  } else { 0 } ) |
+       ( if self.joypad.is_interrupt { 1 << JOYPAD_SHIFT } else { 0 } )
     }
 
     fn store_interrupt(&mut self, value: u8) {
-        self.gpu.is_interrupt   = (value >> VBLANK_SHIFT) & 0x1 != 0;
-        self.timer.is_interrupt = (value >> TIMER_SHIFT)  & 0x4 != 0;
+        self.gpu.is_interrupt    = (value >> VBLANK_SHIFT) & 0x1 != 0;
+        self.timer.is_interrupt  = (value >> TIMER_SHIFT)  & 0x1 != 0;
+        self.joypad.is_interrupt = (value >> JOYPAD_SHIFT) & 0x1 != 0;
     }
 
     fn find_device(&self, addr: u16) -> Option<&dyn Device> {
