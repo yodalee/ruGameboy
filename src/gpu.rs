@@ -133,14 +133,17 @@ pub struct Gpu {
 
     /// sprite
     sprite: [Sprite;40],
+    /// background buffer not mapped by bg_palette
+    unmapped_bg: Vec<u8>,
     // whether vblank interrupt is occured
     pub is_interrupt: bool
 }
 
 impl Gpu {
     pub fn new() -> Self {
-        let ram = vec![0; (VRAM_END - VRAM_START + 1) as usize];
+        let vram = vec![0; (VRAM_END - VRAM_START + 1) as usize];
         let oam = vec![0; (OAM_END - OAM_START + 1) as usize];
+        let unmapped_bg = vec![0; WIDTH * HEIGHT as usize];
         Self {
             clock: 0,
             line: 0,
@@ -151,8 +154,9 @@ impl Gpu {
             mode: GpuMode::ScanlineOAM,
             scy: 0,
             scx: 0,
-            vram: ram,
-            oam: oam,
+            vram,
+            oam,
+            unmapped_bg,
             sprite: [Default::default();40],
             is_interrupt: false
         }
@@ -196,7 +200,7 @@ impl Gpu {
         }
     }
 
-    fn build_background(&self, buffer: &mut Vec<u32>) {
+    fn build_background(&mut self, buffer: &mut Vec<u32>) {
         for row in 0..HEIGHT {
             let offset_row = row + self.scy as usize;
             let tile_row = offset_row / 8;
@@ -208,10 +212,11 @@ impl Gpu {
                 let pixels = self.get_tile_line(tile_idx, line_idx);
 
                 let pixel_start = row * WIDTH + col * 8;
+                self.unmapped_bg.splice(pixel_start..(pixel_start + 8), pixels.iter().cloned());
                 buffer.splice(pixel_start..(pixel_start + 8),
-                      pixels.iter()
-                            .map(|p| self.pixel_map_by_palette(self.bg_palette, *p))
-                            .map(|p| self.pixel_to_color(p)));
+                    pixels.iter()
+                          .map(|p| self.pixel_map_by_palette(self.bg_palette, *p))
+                          .map(|p| self.pixel_to_color(p)));
             }
         }
     }
@@ -219,7 +224,12 @@ impl Gpu {
     fn build_sprite(&self, buffer: &mut Vec<u32>) {
         for sprite in self.sprite.iter() {
             // check sprite intersect with screen
-            if sprite.y + 8 <= 0 || sprite.x + 9 <= 0 ||
+            let sprite_height = if self.lcdc.obj_size {
+                16
+            } else {
+                8
+            };
+            if sprite.y + sprite_height <= 0 || sprite.x + 8 <= 0 ||
                (sprite.x as usize) > WIDTH || (sprite.y as usize) > HEIGHT {
                 continue;
             }
@@ -243,6 +253,10 @@ impl Gpu {
                         continue;
                     }
                     let x_idx = if sprite.flip_x { 7-col_idx } else { col_idx };
+                    if sprite.priority && self.unmapped_bg[y as usize * WIDTH + x as usize] != 0 {
+                        continue;
+                    }
+
                     // fill the buffer
                     let dibit = self.pixel_map_by_palette(palette, pixels[x_idx]);
                     if dibit != 0 {
@@ -254,9 +268,11 @@ impl Gpu {
         }
     }
 
-    pub fn build_screen(&self, buffer: &mut Vec<u32>) {
+    pub fn build_screen(&mut self, buffer: &mut Vec<u32>) {
         if self.lcdc.bg_display {
             self.build_background(buffer);
+        } else {
+            self.unmapped_bg.iter_mut().map(|x| *x = 0).count();
         }
 
         if self.lcdc.obj_display {
