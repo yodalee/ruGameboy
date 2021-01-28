@@ -33,7 +33,7 @@ impl Cpu {
     pub fn new(binary: Vec<u8>) -> Self {
         Self {
             regs: Register::default(),
-            sp: 0,
+            sp: 0xfffe,
             pc: 0x0100, // Starting point of execution
             bus: Bus::new(binary),
             interrupt_state: InterruptState::default(),

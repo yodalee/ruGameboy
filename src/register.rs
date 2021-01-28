@@ -33,7 +33,7 @@ impl std::convert::From<u8> for FlagRegister {
     }
 }
 
-#[derive(Debug,Default)]
+#[derive(Debug)]
 pub struct Register {
     pub a: u8,
     pub b: u8,
@@ -43,6 +43,21 @@ pub struct Register {
     pub f: FlagRegister,
     pub h: u8,
     pub l: u8,
+}
+
+impl Default for Register {
+    fn default() -> Self {
+        Self {
+            a: 0x01,
+            b: 0x00,
+            c: 0x13,
+            d: 0x00,
+            e: 0xd8,
+            f: FlagRegister::from(0xb0),
+            h: 0x01,
+            l: 0x4D,
+        }
+    }
 }
 
 impl Register {
