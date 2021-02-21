@@ -593,6 +593,9 @@ impl Cpu {
                 self.regs.f.carry = (value & 0x80) != 0;
                 self.set_r8(&Target::A, result)?;
             }
+            Instruction::STOP => {
+                // FIXME: we do not implement CPU, LCD behavior
+            }
         }
         self.pc += len;
         Ok(clock)

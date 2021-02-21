@@ -71,6 +71,7 @@ pub enum Instruction {
     RRA,
     DAA,
     RLCA,
+    STOP,
 }
 
 #[derive(Debug)]
@@ -328,6 +329,7 @@ impl Instruction {
             0x1f => Some(Instruction::RRA),
             0x27 => Some(Instruction::DAA),
             0x07 => Some(Instruction::RLCA),
+            0x10 => Some(Instruction::STOP),
             _ => None
         }
     }
@@ -352,6 +354,7 @@ impl Instruction {
             Instruction::XOR(Target::D8) => 1,
             Instruction::OR(Target::D8) =>  1,
             Instruction::CMP(Target::D8) => 1,
+            Instruction::STOP => 1,
             _ => 0,
         }
     }
@@ -409,6 +412,7 @@ impl Instruction {
             Instruction::RRA => 4,
             Instruction::DAA => 4,
             Instruction::RLCA => 4,
+            Instruction::STOP => 4,
         }
     }
 }

@@ -18,6 +18,8 @@ const HRAM_START:     u16 = 0xff80;
 const HRAM_END:       u16 = 0xfffe;
 const INT:            u16 = 0xff0f;
 const INTENB:         u16 = 0xffff;
+const DUMMYIO_START:  u16 = 0xFF4C;
+const DUMMYIO_END:    u16 = 0xFF7F;
 
 /// Bit offset of interrupt register
 const VBLANK_SHIFT: u8 = 0;
@@ -116,7 +118,6 @@ enum IO {
     OBP1    = 0xff49,
     WINY    = 0xff4a,
     WINX    = 0xff4b,
-    Dummy7f = 0xff7f,
 }
 
 pub trait Device {
@@ -182,6 +183,7 @@ impl Bus {
             None => match addr {
                 INT => Ok(self.load_interrupt()),
                 INTENB => Ok(u8::from(&self.interruptenb)),
+                DUMMYIO_START ..= DUMMYIO_END => Ok(0), // dummy hardware IO
                 _ => {
                     // match IO line
                     match FromPrimitive::from_u16(addr) {
@@ -226,6 +228,7 @@ impl Bus {
             None => match addr {
                 INT => Ok(self.store_interrupt(value)),
                 INTENB => Ok(self.interruptenb = InterruptFlag::from(value)),
+                DUMMYIO_START ..= DUMMYIO_END => Ok(()), // dummy hardware IO
                 _ => {
                     // match IO line
                     match FromPrimitive::from_u16(addr) {
