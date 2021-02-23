@@ -6,6 +6,20 @@ const DGRAY: u32 = 0x00555555u32;
 const LGRAY: u32 = 0x00AAAAAAu32;
 const WHITE: u32 = 0x00FFFFFFu32;
 
+/*
+ * VRAM from 0x8000 to 0xA000, 8192 bytes total
+ *
+ * Tile data from 0x8000-0x9000 or 0x8800-0x9800, 4096 bytes
+ * each tile occupy 8x8 pixels, 1 pixel need 2 bits, 16 bytes per tile
+ * -> 4096 bytes can store 256 tiles
+ *
+ * 0x9800-9C00 and 0x9C00-0xA000 stores tile index, 1024 bytes each.
+ * The virtual screen size is 256x256 pixels or 32x32 tiles.
+ * Since we have 256 tiles, we can use 1 bytes to indicate the tile index to display.
+ * To fill the virtual screen we need exactly 1024 tiles.
+ *
+ * The tiles region to use can be switch by setting LCDC (0xff40) bg_tile_map_select
+ */
 pub const VRAM_START:     u16 = 0x8000;
 pub const VRAM_END:       u16 = 0x9fff;
 pub const OAM_START:      u16 = 0xfe00;
@@ -126,7 +140,7 @@ pub struct Gpu {
     pub scy: u8,
     /// SCX: background X position
     pub scx: u8,
-    /// vram: 0x8000-0x9BFF 6144 bytes
+    /// vram: 0x8000-0x9FFF 8192 bytes
     vram: Vec<u8>,
     /// oam: 0xFE00-0xFE9F 160 bytes
     oam: Vec<u8>,
@@ -201,13 +215,18 @@ impl Gpu {
     }
 
     fn build_background(&mut self, buffer: &mut Vec<u32>) {
+        let bg_palette = self.bg_palette;
+        let x = self.scx as usize;
+        let y = (self.scy as usize) % 256;
+        let tile_base = if self.lcdc.bg_tile_map_select { 0x9C00 } else { 0x9800 } - 0x8000;
+
         for row in 0..HEIGHT {
-            let offset_row = row + self.scy as usize;
+            let offset_row = row + y;
             let tile_row = offset_row / 8;
             let line_idx = offset_row % 8;
             for col in 0..(WIDTH/8) {
-                let offset_col = col + self.scx as usize;
-                let tile_addr = tile_row * 32 + offset_col + (0x9800 - 0x8000);
+                let offset_col = col + x;
+                let tile_addr = tile_base + tile_row * 32 + offset_col;
                 let tile_idx = self.vram[tile_addr] as usize;
                 let pixels = self.get_tile_line(tile_idx, line_idx);
 
@@ -215,7 +234,7 @@ impl Gpu {
                 self.unmapped_bg.splice(pixel_start..(pixel_start + 8), pixels.iter().cloned());
                 buffer.splice(pixel_start..(pixel_start + 8),
                     pixels.iter()
-                          .map(|p| self.pixel_map_by_palette(self.bg_palette, *p))
+                          .map(|p| self.pixel_map_by_palette(bg_palette, *p))
                           .map(|p| self.pixel_to_color(p)));
             }
         }
