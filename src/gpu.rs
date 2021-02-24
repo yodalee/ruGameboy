@@ -1,6 +1,8 @@
 use crate::bus::{Device};
 use crate::{WIDTH, HEIGHT};
 
+use std::cmp::min;
+
 const BLACK: u32 = 0x00000000u32;
 const DGRAY: u32 = 0x00555555u32;
 const LGRAY: u32 = 0x00AAAAAAu32;
@@ -217,22 +219,35 @@ impl Gpu {
     fn build_background(&mut self, buffer: &mut Vec<u32>) {
         let bg_palette = self.bg_palette;
         let x = self.scx as usize;
-        let y = (self.scy as usize) % 256;
+        let y = self.scy as usize;
         let tile_base = if self.lcdc.bg_tile_map_select { 0x9C00 } else { 0x9800 } - 0x8000;
 
+        /*
+         * fill the screen from row 0..HEIGHT, col 0..WIDTH
+         * the gameboy can set scx and scy so that the left-top corner of the screen
+         * starts from (scx, scy)
+         */
         for row in 0..HEIGHT {
-            let offset_row = row + y;
-            let tile_row = offset_row / 8;
-            let line_idx = offset_row % 8;
+            let offset_row = (row + y) % 256;
+            if offset_row >= HEIGHT {
+                break;
+            }
+            let tile_row = row / 8;
+            let line_idx = row % 8;
+
             for col in 0..(WIDTH/8) {
-                let offset_col = col + x;
-                let tile_addr = tile_base + tile_row * 32 + offset_col;
+                let tile_addr = tile_base + tile_row * 32 + col;
                 let tile_idx = self.vram[tile_addr] as usize;
                 let pixels = self.get_tile_line(tile_idx, line_idx);
 
-                let pixel_start = row * WIDTH + col * 8;
-                self.unmapped_bg.splice(pixel_start..(pixel_start + 8), pixels.iter().cloned());
-                buffer.splice(pixel_start..(pixel_start + 8),
+                let pixel_start = offset_row * WIDTH + col * 8 + x;
+                if pixel_start >= (offset_row + 1) * WIDTH {
+                    break;
+                }
+                let pixel_end = min((offset_row + 1) * WIDTH, pixel_start + 8);
+
+                self.unmapped_bg.splice(pixel_start..pixel_end, pixels.iter().cloned());
+                buffer.splice(pixel_start..pixel_end,
                     pixels.iter()
                           .map(|p| self.pixel_map_by_palette(bg_palette, *p))
                           .map(|p| self.pixel_to_color(p)));
