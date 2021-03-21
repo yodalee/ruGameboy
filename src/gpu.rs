@@ -178,9 +178,18 @@ impl Gpu {
         }
     }
 
-    pub fn get_tile_line(&self, tile_idx: usize, line_idx: usize) -> Vec<u8> {
+    pub fn get_tile_line(&self, tile_idx: u8, line_idx: usize, is_sprite: bool) -> Vec<u8> {
         assert!(line_idx < 8);
-        let addr = (tile_idx * 8 + line_idx) * 2;
+        let line_idx = line_idx as isize;
+        let addr = if is_sprite || self.lcdc.bg_tile_data_select {
+            let baseaddr = 0x8000 - 0x8000;
+            let tile_idx = tile_idx as isize;
+            baseaddr + (tile_idx * 8 + line_idx) * 2
+        } else {
+            let baseaddr = 0x8800 - 0x8000;
+            let tile_idx = (tile_idx as i8) as isize;
+            baseaddr + (tile_idx * 8 + line_idx) * 2
+        } as usize;
 
         let byte1 = self.vram[addr];
         let byte2 = self.vram[addr+1];
@@ -237,8 +246,8 @@ impl Gpu {
 
             for col in 0..(WIDTH/8) {
                 let tile_addr = tile_base + tile_row * 32 + col;
-                let tile_idx = self.vram[tile_addr] as usize;
-                let pixels = self.get_tile_line(tile_idx, line_idx);
+                let tile_idx = self.vram[tile_addr];
+                let pixels = self.get_tile_line(tile_idx, line_idx, false);
 
                 let pixel_start = offset_row * WIDTH + col * 8 + x;
                 if pixel_start >= (offset_row + 1) * WIDTH {
@@ -280,7 +289,7 @@ impl Gpu {
                     continue;
                 }
                 let y_idx = if sprite.flip_y { 7-row_idx } else { row_idx };
-                let pixels = self.get_tile_line(sprite.tile_idx as usize, y_idx);
+                let pixels = self.get_tile_line(sprite.tile_idx, y_idx, true);
                 for col_idx in 0..8 {
                     let x = sprite.x + col_idx as isize;
                     if x < 0 || (x as usize) > WIDTH {
