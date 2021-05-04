@@ -1,5 +1,5 @@
 use crate::bus::{Device};
-use crate::{WIDTH, HEIGHT};
+use crate::vm::{WIDTH, HEIGHT};
 
 use std::cmp::min;
 

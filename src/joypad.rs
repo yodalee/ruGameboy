@@ -1,17 +1,7 @@
 use crate::bus::Device;
+use crate::vm::JoypadKey;
 
 pub const JOYPAD_ADDR: u16 = 0xff00;
-
-pub enum JoypadKey {
-    RIGHT,
-    LEFT,
-    UP,
-    DOWN,
-    A,
-    B,
-    SELECT,
-    START,
-}
 
 pub struct Joypad {
     p14: u8,

@@ -1,0 +1,12 @@
+[package]
+name = "ru_gameboy_minifb"
+version = "0.1.0"
+authors = ["yodalee <lc85301@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+log = "0.4.11"
+env_logger = "0.8.2"
+minifb = "0.19.1"
+clap = "2.33.3"
+ru_gameboy = { version = "0.1", path = "../" }

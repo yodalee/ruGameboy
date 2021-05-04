@@ -1,26 +1,12 @@
-use std::env;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use log::{error, debug};
+use log::error;
 use clap::{App, Arg};
 
-#[macro_use]
-extern crate num_derive;
 use minifb::{Key, Window, WindowOptions, KeyRepeat};
 
-mod cpu;
-mod gpu;
-mod register;
-mod instruction;
-mod bus;
-mod memory;
-mod vm;
-mod timer;
-mod joypad;
-
-use vm::{Vm, WIDTH, HEIGHT};
-use joypad::{JoypadKey};
+use ru_gameboy::vm::{Vm, WIDTH, HEIGHT, JoypadKey};
 
 const MAX_ENLARGE_SCALE: usize = 5;
 

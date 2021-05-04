@@ -2,6 +2,17 @@ use crate::cpu::Cpu;
 use crate::gpu::GpuMode;
 use log::{debug};
 
+pub enum JoypadKey {
+    RIGHT,
+    LEFT,
+    UP,
+    DOWN,
+    A,
+    B,
+    SELECT,
+    START,
+}
+
 pub const WIDTH: usize = 160;
 pub const HEIGHT: usize = 144;
 
