@@ -1,12 +1,8 @@
 use crate::bus::{Device};
 use crate::vm::{WIDTH, HEIGHT};
+use crate::Pixel;
 
 use std::cmp::min;
-
-const BLACK: u32 = 0x00000000u32;
-const DGRAY: u32 = 0x00555555u32;
-const LGRAY: u32 = 0x00AAAAAAu32;
-const WHITE: u32 = 0x00FFFFFFu32;
 
 /*
  * VRAM from 0x8000 to 0xA000, 8192 bytes total
@@ -205,12 +201,12 @@ impl Gpu {
         pxs
     }
 
-    fn pixel_to_color(&self, pixel: u8) -> u32 {
+    fn pixel_to_color(&self, pixel: u8) -> Pixel {
         match pixel {
-            3 => BLACK,
-            2 => DGRAY,
-            1 => LGRAY,
-            0 => WHITE,
+            3 => Pixel::BLACK,
+            2 => Pixel::DGRAY,
+            1 => Pixel::LGRAY,
+            0 => Pixel::WHITE,
             _ => panic!("Invalid value in u8_to_grayscale"),
         }
     }
@@ -225,7 +221,7 @@ impl Gpu {
         }
     }
 
-    fn build_background(&mut self, buffer: &mut Vec<u32>) {
+    fn build_background(&mut self, buffer: &mut Vec<Pixel>) {
         let bg_palette = self.bg_palette;
         let x = self.scx as usize;
         let y = self.scy as usize;
@@ -264,7 +260,7 @@ impl Gpu {
         }
     }
 
-    fn build_sprite(&self, buffer: &mut Vec<u32>) {
+    fn build_sprite(&self, buffer: &mut Vec<Pixel>) {
         for sprite in self.sprite.iter() {
             // check sprite intersect with screen
             let sprite_height = if self.lcdc.obj_size {
@@ -311,7 +307,7 @@ impl Gpu {
         }
     }
 
-    pub fn build_screen(&mut self, buffer: &mut Vec<u32>) {
+    pub fn build_screen(&mut self, buffer: &mut Vec<Pixel>) {
         if self.lcdc.bg_display {
             self.build_background(buffer);
         } else {

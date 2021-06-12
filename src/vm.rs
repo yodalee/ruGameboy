@@ -1,31 +1,21 @@
 use crate::cpu::Cpu;
 use crate::gpu::GpuMode;
-use log::{debug};
-
-pub enum JoypadKey {
-    RIGHT,
-    LEFT,
-    UP,
-    DOWN,
-    A,
-    B,
-    SELECT,
-    START,
-}
+use crate::Pixel;
+use log::debug;
 
 pub const WIDTH: usize = 160;
 pub const HEIGHT: usize = 144;
 
 pub struct Vm {
     pub cpu: Cpu,
-    pub buffer: Vec<u32>,
+    pub buffer: Vec<Pixel>,
 }
 
 impl Vm {
     pub fn new(binary: Vec<u8>) -> Self {
         Self {
             cpu: Cpu::new(binary),
-            buffer: vec![0; WIDTH * HEIGHT],
+            buffer: vec![Pixel::BLACK; WIDTH * HEIGHT],
         }
     }
 

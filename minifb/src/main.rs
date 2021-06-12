@@ -6,9 +6,14 @@ use clap::{App, Arg};
 
 use minifb::{Key, Window, WindowOptions, KeyRepeat};
 
-use ru_gameboy::vm::{Vm, WIDTH, HEIGHT, JoypadKey};
+use ru_gameboy::vm::{Vm, WIDTH, HEIGHT};
+use ru_gameboy::{JoypadKey, Pixel};
 
 const MAX_ENLARGE_SCALE: usize = 5;
+const BLACK: u32 = 0x00000000u32;
+const DGRAY: u32 = 0x00555555u32;
+const LGRAY: u32 = 0x00AAAAAAu32;
+const WHITE: u32 = 0x00FFFFFFu32;
 
 fn arg_check_range<T>(arg: &str, range: (T, T)) -> Result<T, String>
     where T: Ord + std::str::FromStr + std::fmt::Display
@@ -95,7 +100,16 @@ fn main() -> io::Result<()> {
         if vm.run().is_err() {
             break;
         }
-        window.update_with_buffer(&vm.buffer, WIDTH, HEIGHT).unwrap();
+        let buffer : Vec<u32> = vm.buffer
+            .iter()
+            .map(|pixel| match pixel {
+                Pixel::BLACK => BLACK,
+                Pixel::LGRAY => LGRAY,
+                Pixel::DGRAY => DGRAY,
+                Pixel::WHITE => WHITE,
+            }).collect();
+
+        window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
     }
     vm.dump();
     Ok(())

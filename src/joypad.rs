@@ -1,5 +1,5 @@
 use crate::bus::Device;
-use crate::vm::JoypadKey;
+use crate::JoypadKey;
 
 pub const JOYPAD_ADDR: u16 = 0xff00;
 
