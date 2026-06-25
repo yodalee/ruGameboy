@@ -59,43 +59,39 @@ fn main() -> io::Result<()> {
         HEIGHT * scale,
         WindowOptions::default(),
     ).unwrap_or_else(|e| { panic!("{}", e); });
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+    window.set_target_fps(60);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
 
         // check key press
-        window.get_keys_pressed(KeyRepeat::No).map(|keys| {
-            for key in keys {
-                match key {
-                    Key::Up    => vm.cpu.bus.joypad.presskey(JoypadKey::UP),
-                    Key::Down  => vm.cpu.bus.joypad.presskey(JoypadKey::DOWN),
-                    Key::Left  => vm.cpu.bus.joypad.presskey(JoypadKey::LEFT),
-                    Key::Right => vm.cpu.bus.joypad.presskey(JoypadKey::RIGHT),
-                    Key::A     => vm.cpu.bus.joypad.presskey(JoypadKey::START),
-                    Key::S     => vm.cpu.bus.joypad.presskey(JoypadKey::SELECT),
-                    Key::Z     => vm.cpu.bus.joypad.presskey(JoypadKey::A),
-                    Key::X     => vm.cpu.bus.joypad.presskey(JoypadKey::B),
-                    _ => (),
-                }
+        for key in window.get_keys_pressed(KeyRepeat::No) {
+            match key {
+                Key::Up    => vm.cpu.bus.joypad.presskey(JoypadKey::UP),
+                Key::Down  => vm.cpu.bus.joypad.presskey(JoypadKey::DOWN),
+                Key::Left  => vm.cpu.bus.joypad.presskey(JoypadKey::LEFT),
+                Key::Right => vm.cpu.bus.joypad.presskey(JoypadKey::RIGHT),
+                Key::A     => vm.cpu.bus.joypad.presskey(JoypadKey::START),
+                Key::S     => vm.cpu.bus.joypad.presskey(JoypadKey::SELECT),
+                Key::Z     => vm.cpu.bus.joypad.presskey(JoypadKey::A),
+                Key::X     => vm.cpu.bus.joypad.presskey(JoypadKey::B),
+                _ => (),
             }
-        });
+        }
 
         // check key release
-        window.get_keys_released().map(|keys| {
-            for key in keys {
-                match key {
-                    Key::Up    => vm.cpu.bus.joypad.releasekey(JoypadKey::UP),
-                    Key::Down  => vm.cpu.bus.joypad.releasekey(JoypadKey::DOWN),
-                    Key::Left  => vm.cpu.bus.joypad.releasekey(JoypadKey::LEFT),
-                    Key::Right => vm.cpu.bus.joypad.releasekey(JoypadKey::RIGHT),
-                    Key::A     => vm.cpu.bus.joypad.releasekey(JoypadKey::START),
-                    Key::S     => vm.cpu.bus.joypad.releasekey(JoypadKey::SELECT),
-                    Key::Z     => vm.cpu.bus.joypad.releasekey(JoypadKey::A),
-                    Key::X     => vm.cpu.bus.joypad.releasekey(JoypadKey::B),
-                    _ => (),
-                }
+        for key in window.get_keys_released() {
+            match key {
+                Key::Up    => vm.cpu.bus.joypad.releasekey(JoypadKey::UP),
+                Key::Down  => vm.cpu.bus.joypad.releasekey(JoypadKey::DOWN),
+                Key::Left  => vm.cpu.bus.joypad.releasekey(JoypadKey::LEFT),
+                Key::Right => vm.cpu.bus.joypad.releasekey(JoypadKey::RIGHT),
+                Key::A     => vm.cpu.bus.joypad.releasekey(JoypadKey::START),
+                Key::S     => vm.cpu.bus.joypad.releasekey(JoypadKey::SELECT),
+                Key::Z     => vm.cpu.bus.joypad.releasekey(JoypadKey::A),
+                Key::X     => vm.cpu.bus.joypad.releasekey(JoypadKey::B),
+                _ => (),
             }
-        });
+        }
 
         if vm.run().is_err() {
             break;

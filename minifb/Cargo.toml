@@ -7,6 +7,6 @@ edition = "2018"
 [dependencies]
 log = "0.4.11"
 env_logger = "0.8.2"
-minifb = "0.19.1"
+minifb = "0.28.0"
 clap = "2.33.3"
 ru_gameboy = { version = "0.1", path = "../" }
